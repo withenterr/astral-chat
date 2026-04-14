@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>World Chat</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="intro-card">
+        <p class="eyebrow">Live Room</p>
+        <h1>World Chat</h1>
+        <p class="lede">
+          Share one link and anyone on the internet can join the same room once this is
+          deployed on a public server.
+        </p>
+      </section>
+
+      <section id="join-view" class="panel">
+        <h2>Join The Room</h2>
+        <form id="join-form" class="stack">
+          <label class="field">
+            <span>Display name</span>
+            <input
+              id="name-input"
+              name="name"
+              type="text"
+              maxlength="24"
+              placeholder="Your name"
+              autocomplete="nickname"
+              required
+            />
+          </label>
+          <button class="primary-button" type="submit">Enter Chat</button>
+        </form>
+      </section>
+
+      <section id="chat-view" class="chat-layout is-hidden">
+        <aside class="panel sidebar">
+          <div class="room-header">
+            <div>
+              <p class="eyebrow">Room</p>
+              <h2 id="room-name">Global Room</h2>
+            </div>
+            <span id="online-count" class="count-pill">0 online</span>
+          </div>
+          <p id="connection-status" class="status-line">Disconnected</p>
+          <div class="participant-block">
+            <h3>People Here</h3>
+            <ul id="participant-list" class="participant-list"></ul>
+          </div>
+          <button id="leave-button" class="secondary-button" type="button">Leave Room</button>
+        </aside>
+
+        <section class="panel chat-panel">
+          <div id="message-list" class="message-list" aria-live="polite"></div>
+          <form id="message-form" class="composer">
+            <label class="sr-only" for="message-input">Message</label>
+            <input
+              id="message-input"
+              name="message"
+              type="text"
+              maxlength="280"
+              placeholder="Say something to everyone..."
+              autocomplete="off"
+              required
+            />
+            <button class="primary-button" type="submit">Send</button>
+          </form>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
