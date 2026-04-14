@@ -75,7 +75,15 @@ async function postJson(url, payload, keepalive = false) {
     body: JSON.stringify(payload),
     keepalive,
   });
-  const data = await response.json();
+  const raw = await response.text();
+  const contentType = response.headers.get("content-type") || "";
+  let data = {};
+
+  if (raw && contentType.includes("application/json")) {
+    data = JSON.parse(raw);
+  } else if (raw) {
+    data = { error: raw };
+  }
 
   if (!response.ok) {
     throw new Error(data.error || "Request failed.");

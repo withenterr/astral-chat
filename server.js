@@ -23,6 +23,11 @@ const store = createChatStore({
 });
 const streams = new Map();
 
+function getPathname(url) {
+  const normalizedPath = url.pathname.replace(/\/+$/, "");
+  return normalizedPath || "/";
+}
+
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   response.end(JSON.stringify(payload));
@@ -110,13 +115,14 @@ const server = http.createServer(async (request, response) => {
   }
 
   const url = new URL(request.url, `http://${request.headers.host || `${HOST}:${PORT}`}`);
+  const pathname = getPathname(url);
 
-  if (request.method === "GET" && url.pathname === "/api/health") {
+  if (request.method === "GET" && pathname === "/api/health") {
     sendJson(response, 200, { ok: true });
     return;
   }
 
-  if (request.method === "POST" && url.pathname === "/api/join") {
+  if (request.method === "POST" && pathname === "/api/join") {
     try {
       const { name } = await readBody(request);
       const { session, event } = store.join(name);
@@ -132,7 +138,7 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "POST" && url.pathname === "/api/messages") {
+  if (request.method === "POST" && pathname === "/api/messages") {
     try {
       const { sessionId, text } = await readBody(request);
       const event = store.addMessage(sessionId, text);
@@ -144,7 +150,7 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "POST" && url.pathname === "/api/ping") {
+  if (request.method === "POST" && pathname === "/api/ping") {
     try {
       const { sessionId } = await readBody(request);
       store.touchSession(sessionId);
@@ -155,7 +161,7 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "POST" && url.pathname === "/api/leave") {
+  if (request.method === "POST" && pathname === "/api/leave") {
     try {
       const { sessionId } = await readBody(request);
       const event = store.leave(sessionId);
@@ -172,7 +178,7 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
-  if (request.method === "GET" && url.pathname === "/events") {
+  if (request.method === "GET" && pathname === "/events") {
     const sessionId = url.searchParams.get("sessionId") || "";
 
     if (!store.hasSession(sessionId)) {
