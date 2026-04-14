@@ -1,6 +1,8 @@
 const STORAGE_KEY = "world-chat-name";
+const THEME_KEY = "world-chat-theme";
 const PING_MS = 15_000;
 
+const rootElement = document.documentElement;
 const joinView = document.querySelector("#join-view");
 const chatView = document.querySelector("#chat-view");
 const joinForm = document.querySelector("#join-form");
@@ -13,12 +15,34 @@ const roomName = document.querySelector("#room-name");
 const onlineCount = document.querySelector("#online-count");
 const connectionStatus = document.querySelector("#connection-status");
 const leaveButton = document.querySelector("#leave-button");
+const themeToggle = document.querySelector("#theme-toggle");
 
 let session = null;
 let eventSource = null;
 let pingTimer = null;
 
 nameInput.value = localStorage.getItem(STORAGE_KEY) || "";
+
+function getPreferredTheme() {
+  const savedTheme = localStorage.getItem(THEME_KEY);
+
+  if (savedTheme === "light" || savedTheme === "dark") {
+    return savedTheme;
+  }
+
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function applyTheme(theme, persist = true) {
+  rootElement.dataset.theme = theme;
+  rootElement.style.colorScheme = theme;
+  themeToggle.textContent = theme === "dark" ? "Light mode" : "Dark mode";
+  themeToggle.setAttribute("aria-pressed", String(theme === "dark"));
+
+  if (persist) {
+    localStorage.setItem(THEME_KEY, theme);
+  }
+}
 
 function setConnectedState(isConnected) {
   connectionStatus.textContent = isConnected ? "Live connection" : "Reconnecting...";
@@ -198,6 +222,13 @@ messageForm.addEventListener("submit", async (event) => {
 leaveButton.addEventListener("click", () => {
   leaveChat();
 });
+
+themeToggle.addEventListener("click", () => {
+  const nextTheme = rootElement.dataset.theme === "dark" ? "light" : "dark";
+  applyTheme(nextTheme);
+});
+
+applyTheme(getPreferredTheme(), false);
 
 window.addEventListener("beforeunload", () => {
   if (!session) {
