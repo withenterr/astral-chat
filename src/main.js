@@ -17,6 +17,10 @@ const participantList = document.querySelector("#participant-list");
 const roomName = document.querySelector("#room-name");
 const onlineCount = document.querySelector("#online-count");
 const connectionStatus = document.querySelector("#connection-status");
+const redeemToggle = document.querySelector("#redeem-toggle");
+const redeemForm = document.querySelector("#redeem-form");
+const redeemInput = document.querySelector("#redeem-input");
+const redeemStatus = document.querySelector("#redeem-status");
 const themeToggle = document.querySelector("#theme-toggle");
 const menuLeaveButton = document.querySelector("#menu-leave-button");
 
@@ -47,6 +51,19 @@ function applyTheme(theme, persist = true) {
   }
 }
 
+function setRedeemStatus(message, isError = false) {
+  if (!message) {
+    redeemStatus.textContent = "";
+    redeemStatus.classList.add("is-hidden");
+    redeemStatus.classList.remove("is-error");
+    return;
+  }
+
+  redeemStatus.textContent = message;
+  redeemStatus.classList.remove("is-hidden");
+  redeemStatus.classList.toggle("is-error", isError);
+}
+
 function setConnectedState(isConnected) {
   connectionStatus.textContent = isConnected ? "Live connection" : "Reconnecting...";
 }
@@ -56,8 +73,13 @@ function setMenuOpen(isOpen) {
   menuToggle.setAttribute("aria-expanded", String(isOpen));
 }
 
+function isCurrentUserAdmin() {
+  return session?.role === "admin";
+}
+
 function syncOptionState() {
   menuLeaveButton.disabled = !session;
+  redeemToggle.disabled = !session;
 }
 
 function toggleViews(isInChat) {
@@ -72,7 +94,61 @@ function renderParticipants(participants) {
   for (const participant of participants) {
     const item = document.createElement("li");
     item.className = "participant-item";
-    item.textContent = participant.name;
+    if (participant.role === "admin") {
+      item.classList.add("participant-item--admin");
+    }
+
+    const details = document.createElement("div");
+    details.className = "participant-details";
+
+    const nameRow = document.createElement("div");
+    nameRow.className = "participant-name-row";
+
+    const name = document.createElement("span");
+    name.className = "participant-name";
+    name.textContent = participant.id === session?.id ? `${participant.name} (You)` : participant.name;
+    nameRow.append(name);
+
+    if (participant.role === "admin") {
+      const roleBadge = document.createElement("span");
+      roleBadge.className = "participant-badge participant-badge--admin";
+      roleBadge.textContent = "Admin";
+      nameRow.append(roleBadge);
+    }
+
+    if (participant.isMuted) {
+      const mutedBadge = document.createElement("span");
+      mutedBadge.className = "participant-badge";
+      mutedBadge.textContent = "Muted";
+      nameRow.append(mutedBadge);
+    }
+
+    details.append(nameRow);
+    item.append(details);
+
+    if (isCurrentUserAdmin() && participant.id !== session?.id) {
+      const actions = document.createElement("div");
+      actions.className = "participant-actions";
+
+      const muteButton = document.createElement("button");
+      muteButton.className = "secondary-button participant-action";
+      muteButton.type = "button";
+      muteButton.dataset.action = "mute";
+      muteButton.dataset.participantId = participant.id;
+      muteButton.dataset.muted = String(Boolean(participant.isMuted));
+      muteButton.textContent = participant.isMuted ? "Unmute" : "Mute";
+
+      const kickButton = document.createElement("button");
+      kickButton.className = "secondary-button participant-action participant-action--danger";
+      kickButton.type = "button";
+      kickButton.dataset.action = "kick";
+      kickButton.dataset.participantId = participant.id;
+      kickButton.textContent = "Kick";
+
+      actions.append(muteButton, kickButton);
+      item.append(actions);
+    }
+
     participantList.append(item);
   }
 }
@@ -85,9 +161,22 @@ function renderMessages(messages) {
     item.className = `message-card message-card--${message.type}`;
 
     if (message.type === "system") {
-      item.innerHTML = `<p>${message.text}</p>`;
+      const text = document.createElement("p");
+      text.textContent = message.text;
+      item.append(text);
     } else {
-      item.innerHTML = `<p class="message-author">${message.name}</p><p>${message.text}</p>`;
+      if (message.role === "admin") {
+        item.classList.add("message-card--admin");
+      }
+
+      const author = document.createElement("p");
+      author.className = "message-author";
+      author.textContent = message.name;
+      item.append(author);
+
+      const text = document.createElement("p");
+      text.textContent = message.text;
+      item.append(text);
     }
 
     messageList.append(item);
@@ -99,8 +188,22 @@ function renderMessages(messages) {
 function renderSnapshot(payload) {
   roomName.textContent = payload.roomName;
   onlineCount.textContent = `${payload.snapshot.onlineCount} online`;
+
+  if (session) {
+    const me = payload.snapshot.participants.find((participant) => participant.id === session.id);
+
+    if (me) {
+      session = {
+        ...session,
+        role: me.role,
+        isMuted: me.isMuted,
+      };
+    }
+  }
+
   renderParticipants(payload.snapshot.participants);
   renderMessages(payload.snapshot.messages);
+  syncOptionState();
 }
 
 async function postJson(url, payload, keepalive = false) {
@@ -141,6 +244,19 @@ function clearRealtime() {
   }
 }
 
+function handleForcedLogout(message) {
+  clearRealtime();
+  session = null;
+  toggleViews(false);
+  participantList.innerHTML = "";
+  messageList.innerHTML = "";
+  onlineCount.textContent = "0 online";
+  connectionStatus.textContent = "Disconnected";
+  setMenuOpen(false);
+  setRedeemStatus("");
+  window.alert(message);
+}
+
 function openRealtimeChannel() {
   clearRealtime();
   eventSource = new EventSource(`/events?sessionId=${encodeURIComponent(session.id)}`);
@@ -151,6 +267,12 @@ function openRealtimeChannel() {
 
   eventSource.onmessage = (event) => {
     const payload = JSON.parse(event.data);
+
+    if (payload.type === "forced-logout") {
+      handleForcedLogout(payload.message || "You were removed from the room.");
+      return;
+    }
+
     renderSnapshot(payload);
     setConnectedState(true);
   };
@@ -178,6 +300,7 @@ async function joinChat(name) {
   localStorage.setItem(STORAGE_KEY, session.name);
   toggleViews(true);
   setMenuOpen(false);
+  setRedeemStatus("");
   renderSnapshot(payload);
   openRealtimeChannel();
   messageInput.focus();
@@ -197,6 +320,7 @@ async function leaveChat() {
   onlineCount.textContent = "0 online";
   connectionStatus.textContent = "Disconnected";
   setMenuOpen(false);
+  setRedeemStatus("");
 
   try {
     await postJson("/api/leave", { sessionId }, true);
@@ -234,6 +358,36 @@ messageForm.addEventListener("submit", async (event) => {
   }
 });
 
+redeemToggle.addEventListener("click", () => {
+  const shouldShow = redeemForm.classList.contains("is-hidden");
+  redeemForm.classList.toggle("is-hidden", !shouldShow);
+
+  if (shouldShow) {
+    redeemInput.focus();
+  }
+});
+
+redeemForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  if (!session) {
+    return;
+  }
+
+  try {
+    const payload = await postJson("/api/redeem", {
+      sessionId: session.id,
+      code: redeemInput.value,
+    });
+    redeemInput.value = "";
+    redeemForm.classList.add("is-hidden");
+    renderSnapshot(payload);
+    setRedeemStatus("Code redeemed successfully.");
+  } catch (error) {
+    setRedeemStatus(error.message, true);
+  }
+});
+
 themeToggle.addEventListener("click", () => {
   const nextTheme = rootElement.dataset.theme === "dark" ? "light" : "dark";
   applyTheme(nextTheme);
@@ -245,6 +399,37 @@ menuToggle.addEventListener("click", () => {
 
 menuLeaveButton.addEventListener("click", () => {
   leaveChat();
+});
+
+participantList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-action]");
+
+  if (!button || !session) {
+    return;
+  }
+
+  const targetSessionId = button.dataset.participantId;
+  const action = button.dataset.action;
+
+  try {
+    if (action === "mute") {
+      await postJson("/api/admin/mute", {
+        sessionId: session.id,
+        targetSessionId,
+        muted: button.dataset.muted !== "true",
+      });
+      return;
+    }
+
+    if (action === "kick") {
+      await postJson("/api/admin/kick", {
+        sessionId: session.id,
+        targetSessionId,
+      });
+    }
+  } catch (error) {
+    window.alert(error.message);
+  }
 });
 
 document.addEventListener("click", (event) => {

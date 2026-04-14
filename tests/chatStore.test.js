@@ -20,9 +20,12 @@ test("join adds a participant and emits a system message", () => {
   const snapshot = store.getSnapshot();
 
   assert.equal(session.name, "Alice");
+  assert.equal(session.role, "member");
   assert.equal(event.type, "system");
   assert.equal(snapshot.onlineCount, 1);
-  assert.deepEqual(snapshot.participants, [{ id: session.id, name: "Alice" }]);
+  assert.deepEqual(snapshot.participants, [
+    { id: session.id, name: "Alice", role: "member", isMuted: false },
+  ]);
 });
 
 test("addMessage stores a trimmed chat message for the joined user", () => {
@@ -43,6 +46,43 @@ test("join rejects duplicate names even with different casing", () => {
   assert.throws(() => {
     store.join("John");
   }, /already in use/i);
+});
+
+test("grantRole upgrades a member to admin", () => {
+  const store = createDeterministicStore();
+  const { session } = store.join("Mia");
+  const promoted = store.grantRole(session.id, "admin");
+
+  assert.equal(promoted.session.role, "admin");
+  assert.equal(store.getSnapshot().participants[0].role, "admin");
+});
+
+test("admins can mute and kick other people", () => {
+  const store = createDeterministicStore();
+  const { session: admin } = store.join("Admin");
+  const { session: target } = store.join("Target");
+
+  store.grantRole(admin.id, "admin");
+  store.setMuted(admin.id, target.id, true);
+
+  assert.throws(() => {
+    store.addMessage(target.id, "hello");
+  }, /muted/i);
+
+  const result = store.kick(admin.id, target.id);
+
+  assert.equal(result.target.name, "Target");
+  assert.equal(store.hasSession(target.id), false);
+});
+
+test("non-admins cannot mute other people", () => {
+  const store = createDeterministicStore();
+  const { session: first } = store.join("One");
+  const { session: second } = store.join("Two");
+
+  assert.throws(() => {
+    store.setMuted(first.id, second.id, true);
+  }, /only admins/i);
 });
 
 test("leave removes the participant and appends a system event", () => {

@@ -1,6 +1,8 @@
 const DEFAULT_MAX_MESSAGES = 120;
 const DEFAULT_MAX_NAME_LENGTH = 24;
 const DEFAULT_MAX_TEXT_LENGTH = 280;
+const ROLE_MEMBER = "member";
+const ROLE_ADMIN = "admin";
 
 function normalizeText(value, maxLength) {
   return String(value || "")
@@ -33,6 +35,15 @@ function buildChatMessage(name, text, createId, clock) {
   };
 }
 
+function serializeSession(session) {
+  return {
+    id: session.id,
+    name: session.name,
+    role: session.role,
+    isMuted: session.isMuted,
+  };
+}
+
 export function createChatStore({
   idGenerator = () => crypto.randomUUID(),
   clock = () => Date.now(),
@@ -51,10 +62,7 @@ export function createChatStore({
 
   function getSnapshot() {
     const participants = [...sessions.values()]
-      .map((session) => ({
-        id: session.id,
-        name: session.name,
-      }))
+      .map(serializeSession)
       .sort((first, second) => first.name.localeCompare(second.name));
 
     return {
@@ -82,9 +90,31 @@ export function createChatStore({
     const session = {
       id: idGenerator(),
       name: normalizedName,
+      role: ROLE_MEMBER,
+      isMuted: false,
       lastSeenAt: clock(),
     };
     sessions.set(session.id, session);
+    return session;
+  }
+
+  function getSessionOrThrow(sessionId, errorMessage = "Session expired. Please join again.") {
+    const session = sessions.get(sessionId);
+
+    if (!session) {
+      throw new Error(errorMessage);
+    }
+
+    return session;
+  }
+
+  function assertAdmin(sessionId) {
+    const session = getSessionOrThrow(sessionId);
+
+    if (session.role !== ROLE_ADMIN) {
+      throw new Error("Only admins can do that.");
+    }
+
     return session;
   }
 
@@ -92,7 +122,7 @@ export function createChatStore({
     const session = createSession(name);
     const event = buildSystemMessage(`${session.name} joined the room.`, idGenerator, clock);
     pushMessage(event);
-    return { session: { id: session.id, name: session.name }, event };
+    return { session: serializeSession(session), event };
   }
 
   function leave(sessionId) {
@@ -109,10 +139,10 @@ export function createChatStore({
   }
 
   function addMessage(sessionId, text) {
-    const session = sessions.get(sessionId);
+    const session = getSessionOrThrow(sessionId);
 
-    if (!session) {
-      throw new Error("Session expired. Please join again.");
+    if (session.isMuted) {
+      throw new Error("You are muted and cannot send messages.");
     }
 
     const normalizedText = normalizeText(text, DEFAULT_MAX_TEXT_LENGTH);
@@ -123,18 +153,62 @@ export function createChatStore({
 
     session.lastSeenAt = clock();
     const message = buildChatMessage(session.name, normalizedText, idGenerator, clock);
+    message.role = session.role;
     pushMessage(message);
     return message;
   }
 
   function touchSession(sessionId) {
-    const session = sessions.get(sessionId);
+    const session = getSessionOrThrow(sessionId);
+    session.lastSeenAt = clock();
+  }
 
-    if (!session) {
-      throw new Error("Session expired. Please join again.");
+  function grantRole(sessionId, role) {
+    const session = getSessionOrThrow(sessionId);
+
+    if (session.role === role) {
+      return { session: serializeSession(session), event: null };
     }
 
-    session.lastSeenAt = clock();
+    session.role = role;
+    const event = buildSystemMessage(`${session.name} is now an admin.`, idGenerator, clock);
+    pushMessage(event);
+    return { session: serializeSession(session), event };
+  }
+
+  function setMuted(actorSessionId, targetSessionId, muted) {
+    const actor = assertAdmin(actorSessionId);
+
+    if (actorSessionId === targetSessionId) {
+      throw new Error("You can't mute yourself.");
+    }
+
+    const target = getSessionOrThrow(targetSessionId, "That person is no longer in the room.");
+    target.isMuted = Boolean(muted);
+    target.lastSeenAt = clock();
+
+    const event = buildSystemMessage(
+      `${target.name} was ${target.isMuted ? "muted" : "unmuted"} by ${actor.name}.`,
+      idGenerator,
+      clock,
+    );
+    pushMessage(event);
+    return { target: serializeSession(target), event };
+  }
+
+  function kick(actorSessionId, targetSessionId) {
+    const actor = assertAdmin(actorSessionId);
+
+    if (actorSessionId === targetSessionId) {
+      throw new Error("You can't kick yourself.");
+    }
+
+    const target = getSessionOrThrow(targetSessionId, "That person is no longer in the room.");
+    sessions.delete(target.id);
+
+    const event = buildSystemMessage(`${target.name} was kicked by ${actor.name}.`, idGenerator, clock);
+    pushMessage(event);
+    return { target: serializeSession(target), event };
   }
 
   function removeInactiveSessions(maxIdleMs) {
@@ -163,11 +237,14 @@ export function createChatStore({
 
   return {
     addMessage,
+    grantRole,
     getSnapshot,
     hasSession,
     join,
+    kick,
     leave,
     removeInactiveSessions,
+    setMuted,
     touchSession,
   };
 }

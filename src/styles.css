@@ -24,6 +24,7 @@
   --system-message-background: #f3eadb;
   --system-message-text: #544a3a;
   --menu-background: rgba(255, 252, 245, 0.97);
+  --admin-accent: #b53a32;
   background: var(--page-background);
   color: var(--text-color);
 }
@@ -53,6 +54,7 @@
   --system-message-background: #2a261f;
   --system-message-text: #d7ccb9;
   --menu-background: rgba(28, 26, 22, 0.97);
+  --admin-accent: #ff6d63;
 }
 
 * {
@@ -151,6 +153,25 @@ body.menu-open .options-menu {
 .menu-button {
   width: 100%;
   text-align: left;
+}
+
+.redeem-form {
+  display: grid;
+  gap: 10px;
+}
+
+.menu-submit {
+  width: 100%;
+}
+
+.menu-status {
+  margin: 0;
+  font-size: 0.94rem;
+  color: var(--muted-text);
+}
+
+.menu-status.is-error {
+  color: var(--admin-accent);
 }
 
 .menu-button:disabled {
@@ -302,6 +323,58 @@ input {
   padding: 10px 12px;
   border-radius: 12px;
   background: var(--participant-background);
+  display: grid;
+  gap: 10px;
+}
+
+.participant-details {
+  display: grid;
+  gap: 8px;
+}
+
+.participant-name-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.participant-name {
+  font-weight: 600;
+}
+
+.participant-item--admin .participant-name {
+  color: var(--admin-accent);
+}
+
+.participant-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--pill-background);
+  color: var(--muted-text);
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.participant-badge--admin {
+  color: var(--admin-accent);
+}
+
+.participant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.participant-action {
+  padding: 8px 12px;
+  font-size: 0.92rem;
+}
+
+.participant-action--danger {
+  border-color: var(--admin-accent);
+  color: var(--admin-accent);
 }
 
 .chat-panel {
@@ -338,6 +411,10 @@ input {
 .message-author {
   font-weight: 600;
   margin-bottom: 6px;
+}
+
+.message-card--admin .message-author {
+  color: var(--admin-accent);
 }
 
 .composer {

@@ -1,7 +1,7 @@
 import { createReadStream, existsSync, statSync } from "node:fs";
 import http from "node:http";
 import { extname, join, normalize } from "node:path";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 import { createChatStore } from "./src/chatStore.js";
 
@@ -10,6 +10,9 @@ const PORT = Number(process.env.PORT || 3000);
 const ROOT = process.cwd();
 const PRESENCE_MAX_IDLE_MS = 30_000;
 const PRESENCE_SWEEP_MS = 10_000;
+const ADMIN_REDEEM_CODE_HASH =
+  process.env.ADMIN_REDEEM_CODE_HASH ||
+  "2030f95dcd3e609feefdace6b70ad33cb5573c2efbc8ccbe95e56f9e9adde21f";
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -22,6 +25,24 @@ const store = createChatStore({
   clock: () => Date.now(),
 });
 const streams = new Map();
+
+function hashValue(value) {
+  return createHash("sha256").update(String(value || "")).digest("hex");
+}
+
+function resolveRedeemRole(code) {
+  const normalizedCode = String(code || "").trim();
+
+  if (!normalizedCode) {
+    throw new Error("Please enter a redeem code.");
+  }
+
+  if (hashValue(normalizedCode) === ADMIN_REDEEM_CODE_HASH) {
+    return "admin";
+  }
+
+  throw new Error("That code is not valid.");
+}
 
 function getPathname(url) {
   const normalizedPath = url.pathname.replace(/\/+$/, "");
@@ -66,6 +87,21 @@ function resolvePath(urlPath) {
 
 function writeEvent(response, event) {
   response.write(`data: ${JSON.stringify(event)}\n\n`);
+}
+
+function sendForcedLogout(sessionId, message) {
+  const stream = streams.get(sessionId);
+
+  if (!stream) {
+    return;
+  }
+
+  writeEvent(stream, {
+    type: "forced-logout",
+    message,
+  });
+  stream.end();
+  streams.delete(sessionId);
 }
 
 function broadcast(lastEvent = null) {
@@ -150,11 +186,57 @@ const server = http.createServer(async (request, response) => {
     return;
   }
 
+  if (request.method === "POST" && pathname === "/api/redeem") {
+    try {
+      const { sessionId, code } = await readBody(request);
+      const role = resolveRedeemRole(code);
+      const { session, event } = store.grantRole(sessionId, role);
+      sendJson(response, 200, {
+        ok: true,
+        session,
+        snapshot: store.getSnapshot(),
+        roomName: "Global Room",
+      });
+
+      if (event) {
+        broadcast(event);
+      }
+    } catch (error) {
+      sendJson(response, 400, { error: error.message });
+    }
+    return;
+  }
+
   if (request.method === "POST" && pathname === "/api/ping") {
     try {
       const { sessionId } = await readBody(request);
       store.touchSession(sessionId);
       sendJson(response, 200, { ok: true });
+    } catch (error) {
+      sendJson(response, 400, { error: error.message });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/admin/mute") {
+    try {
+      const { sessionId, targetSessionId, muted } = await readBody(request);
+      const { event } = store.setMuted(sessionId, targetSessionId, muted);
+      sendJson(response, 200, { ok: true });
+      broadcast(event);
+    } catch (error) {
+      sendJson(response, 400, { error: error.message });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/admin/kick") {
+    try {
+      const { sessionId, targetSessionId } = await readBody(request);
+      const { target, event } = store.kick(sessionId, targetSessionId);
+      sendForcedLogout(target.id, "You were kicked from the room by an admin.");
+      sendJson(response, 200, { ok: true });
+      broadcast(event);
     } catch (error) {
       sendJson(response, 400, { error: error.message });
     }

@@ -22,6 +22,22 @@
 
     <section id="options-menu" class="options-menu" aria-label="Options">
       <p class="menu-title">Options</p>
+      <button id="redeem-toggle" class="secondary-button menu-button" type="button" disabled>
+        Redeem Code
+      </button>
+      <form id="redeem-form" class="redeem-form is-hidden">
+        <label class="sr-only" for="redeem-input">Redeem code</label>
+        <input
+          id="redeem-input"
+          name="redeemCode"
+          type="text"
+          maxlength="64"
+          placeholder="Enter access code"
+          autocomplete="off"
+        />
+        <button class="primary-button menu-submit" type="submit">Apply</button>
+      </form>
+      <p id="redeem-status" class="menu-status is-hidden" aria-live="polite"></p>
       <button id="theme-toggle" class="secondary-button menu-button" type="button">
         Dark mode
       </button>
