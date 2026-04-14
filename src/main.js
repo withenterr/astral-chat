@@ -3,6 +3,9 @@ const THEME_KEY = "world-chat-theme";
 const PING_MS = 15_000;
 
 const rootElement = document.documentElement;
+const bodyElement = document.body;
+const menuToggle = document.querySelector("#menu-toggle");
+const optionsMenu = document.querySelector("#options-menu");
 const joinView = document.querySelector("#join-view");
 const chatView = document.querySelector("#chat-view");
 const joinForm = document.querySelector("#join-form");
@@ -14,8 +17,8 @@ const participantList = document.querySelector("#participant-list");
 const roomName = document.querySelector("#room-name");
 const onlineCount = document.querySelector("#online-count");
 const connectionStatus = document.querySelector("#connection-status");
-const leaveButton = document.querySelector("#leave-button");
 const themeToggle = document.querySelector("#theme-toggle");
+const menuLeaveButton = document.querySelector("#menu-leave-button");
 
 let session = null;
 let eventSource = null;
@@ -48,9 +51,19 @@ function setConnectedState(isConnected) {
   connectionStatus.textContent = isConnected ? "Live connection" : "Reconnecting...";
 }
 
+function setMenuOpen(isOpen) {
+  bodyElement.classList.toggle("menu-open", isOpen);
+  menuToggle.setAttribute("aria-expanded", String(isOpen));
+}
+
+function syncOptionState() {
+  menuLeaveButton.disabled = !session;
+}
+
 function toggleViews(isInChat) {
   joinView.classList.toggle("is-hidden", isInChat);
   chatView.classList.toggle("is-hidden", !isInChat);
+  syncOptionState();
 }
 
 function renderParticipants(participants) {
@@ -164,6 +177,7 @@ async function joinChat(name) {
   session = payload.session;
   localStorage.setItem(STORAGE_KEY, session.name);
   toggleViews(true);
+  setMenuOpen(false);
   renderSnapshot(payload);
   openRealtimeChannel();
   messageInput.focus();
@@ -182,6 +196,7 @@ async function leaveChat() {
   messageList.innerHTML = "";
   onlineCount.textContent = "0 online";
   connectionStatus.textContent = "Disconnected";
+  setMenuOpen(false);
 
   try {
     await postJson("/api/leave", { sessionId }, true);
@@ -219,16 +234,37 @@ messageForm.addEventListener("submit", async (event) => {
   }
 });
 
-leaveButton.addEventListener("click", () => {
-  leaveChat();
-});
-
 themeToggle.addEventListener("click", () => {
   const nextTheme = rootElement.dataset.theme === "dark" ? "light" : "dark";
   applyTheme(nextTheme);
 });
 
+menuToggle.addEventListener("click", () => {
+  setMenuOpen(!bodyElement.classList.contains("menu-open"));
+});
+
+menuLeaveButton.addEventListener("click", () => {
+  leaveChat();
+});
+
+document.addEventListener("click", (event) => {
+  if (
+    bodyElement.classList.contains("menu-open") &&
+    !optionsMenu.contains(event.target) &&
+    !menuToggle.contains(event.target)
+  ) {
+    setMenuOpen(false);
+  }
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    setMenuOpen(false);
+  }
+});
+
 applyTheme(getPreferredTheme(), false);
+syncOptionState();
 
 window.addEventListener("beforeunload", () => {
   if (!session) {
