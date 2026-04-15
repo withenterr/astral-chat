@@ -166,6 +166,9 @@ function renderParticipants(participants) {
   for (const participant of participants) {
     const item = document.createElement("li");
     item.className = "participant-item";
+    if (participant.id === session?.id) {
+      item.classList.add("participant-item--self");
+    }
     if (participant.role === "admin") {
       item.classList.add("participant-item--admin");
     }
@@ -237,16 +240,21 @@ function renderMessages(messages) {
       text.textContent = message.text;
       item.append(text);
     } else {
+      const isOutgoing = message.name === session?.name;
+
+      item.classList.add(isOutgoing ? "message-card--outgoing" : "message-card--incoming");
+
       if (message.role === "admin") {
         item.classList.add("message-card--admin");
       }
 
       const author = document.createElement("p");
       author.className = "message-author";
-      author.textContent = message.name;
+      author.textContent = isOutgoing ? "You" : message.name;
       item.append(author);
 
       const text = document.createElement("p");
+      text.className = "message-text";
       text.textContent = message.text;
       item.append(text);
     }

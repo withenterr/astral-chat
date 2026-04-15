@@ -153,24 +153,23 @@
         <p class="auth-note">Accounts not used for more than 1 week are deleted.</p>
       </section>
 
-      <section id="chat-view" class="chat-layout is-hidden">
-        <aside class="panel sidebar">
-          <div class="room-header">
-            <div>
-              <p class="eyebrow">Room</p>
+      <section id="chat-view" class="chat-screen is-hidden">
+        <section class="chat-phone">
+          <header class="chat-header">
+            <div class="chat-header-copy">
+              <p class="eyebrow">Chatting Now</p>
               <h2 id="room-name">Global Room</h2>
+              <p id="connection-status" class="status-line">Disconnected</p>
             </div>
             <span id="online-count" class="count-pill">0 online</span>
-          </div>
-          <p id="connection-status" class="status-line">Disconnected</p>
-          <div class="participant-block">
-            <h3>People Here</h3>
-            <ul id="participant-list" class="participant-list"></ul>
-          </div>
-        </aside>
+          </header>
 
-        <section class="panel chat-panel">
+          <section class="chat-people" aria-label="People here">
+            <ul id="participant-list" class="participant-list"></ul>
+          </section>
+
           <div id="message-list" class="message-list" aria-live="polite"></div>
+
           <form id="message-form" class="composer">
             <label class="sr-only" for="message-input">Message</label>
             <input
@@ -178,11 +177,11 @@
               name="message"
               type="text"
               maxlength="280"
-              placeholder="Say something to everyone..."
+              placeholder="Say something..."
               autocomplete="off"
               required
             />
-            <button class="primary-button" type="submit">Send</button>
+            <button class="primary-button composer-send" type="submit">Send</button>
           </form>
         </section>
       </section>
