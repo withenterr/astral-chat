@@ -380,23 +380,6 @@ input:focus {
   gap: 2px;
 }
 
-.chat-switcher {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.chat-switcher-tab {
-  min-height: 42px;
-  padding: 10px 14px;
-  font-size: 0.92rem;
-  font-weight: 700;
-}
-
-.chat-switcher-tab--active {
-  background: linear-gradient(135deg, rgba(17, 184, 255, 0.18), rgba(255, 92, 168, 0.18));
-  box-shadow: inset 0 0 0 1px rgba(17, 184, 255, 0.16);
-}
 
 .count-pill {
   display: inline-flex;
