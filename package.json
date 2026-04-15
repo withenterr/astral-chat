@@ -6,5 +6,8 @@
     "dev": "node server.js",
     "start": "node server.js",
     "test": "node --test"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.0.0"
   }
 }
