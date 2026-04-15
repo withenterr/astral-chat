@@ -724,12 +724,63 @@ async function handleAuthSubmit(event, isSignUp) {
   }
 }
 
-logInForm.addEventListener("submit", async (event) => {
-  await handleAuthSubmit(event, authMode === "sign-up");
+// Login button click handler
+document.getElementById('log-in-submit-button').addEventListener('click', async (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  
+  setAuthStatus("");
+  
+  try {
+    const username = logInUsernameInput.value;
+    const password = logInPasswordInput.value;
+    
+    if (!username || !password) {
+      setAuthStatus("Please fill in all fields", true);
+      return;
+    }
+    
+    await authenticateAndJoin(signIn, username, password);
+  } catch (error) {
+    console.error("Login error:", error);
+    setAuthStatus(error.message || "Login failed", true);
+  }
 });
 
-signUpForm.addEventListener("submit", async (event) => {
-  await handleAuthSubmit(event, true);
+// Signup button click handler
+document.getElementById('create-account-button').addEventListener('click', async (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  
+  if (createAccountButton.disabled) {
+    return;
+  }
+  
+  setAuthStatus("");
+  
+  try {
+    const username = signUpUsernameInput.value;
+    const password = signUpPasswordInput.value;
+    
+    if (!username || !password) {
+      setAuthStatus("Please fill in all fields", true);
+      return;
+    }
+    
+    await authenticateAndJoin(signUp, username, password);
+  } catch (error) {
+    console.error("Signup error:", error);
+    
+    if ((error.message || "").toLowerCase().includes("already registered") || 
+        (error.message || "").toLowerCase().includes("duplicate")) {
+      signUpUsernameAvailable = false;
+      setUsernameStatus("Used", "error");
+      syncCreateAccountState();
+      return;
+    }
+    
+    setAuthStatus(error.message || "Signup failed", true);
+  }
 });
 
 signUpUsernameInput.addEventListener("input", () => {

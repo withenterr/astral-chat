@@ -93,7 +93,7 @@
           </button>
         </div>
 
-        <form id="log-in-form" class="stack auth-form">
+        <form id="log-in-form" class="stack auth-form" onsubmit="return false;">
           <label class="field">
             <span>Username</span>
             <input
@@ -117,10 +117,10 @@
               required
             />
           </label>
-          <button id="log-in-submit-button" class="primary-button" type="submit">Log In</button>
+          <button id="log-in-submit-button" class="primary-button" type="button">Log In</button>
         </form>
 
-        <form id="sign-up-form" class="stack auth-form is-hidden">
+        <form id="sign-up-form" class="stack auth-form is-hidden" onsubmit="return false;">
           <label class="field">
             <span>Username</span>
             <input
@@ -145,7 +145,7 @@
               required
             />
           </label>
-          <button id="create-account-button" class="primary-button" type="submit" disabled>
+          <button id="create-account-button" class="primary-button" type="button" disabled>
             Create Account
           </button>
         </form>
