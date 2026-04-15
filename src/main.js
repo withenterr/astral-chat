@@ -883,6 +883,81 @@ function handleParticipantAction(event) {
 participantList.addEventListener("click", handleParticipantAction);
 peopleParticipantList.addEventListener("click", handleParticipantAction);
 
+chatView.addEventListener(
+  "touchstart",
+  (event) => {
+    if (!session || event.touches.length !== 1) {
+      return;
+    }
+
+    swipeTracking = true;
+    swipeStartX = event.touches[0].clientX;
+  },
+  { passive: true },
+);
+
+chatView.addEventListener(
+  "touchend",
+  (event) => {
+    if (!swipeTracking || !session || event.changedTouches.length !== 1) {
+      swipeTracking = false;
+      return;
+    }
+
+    const deltaX = event.changedTouches[0].clientX - swipeStartX;
+    swipeTracking = false;
+
+    if (Math.abs(deltaX) < 56) {
+      return;
+    }
+
+    if (deltaX < 0) {
+      setActivePane("people");
+      return;
+    }
+
+    setActivePane("chat");
+  },
+  { passive: true },
+);
+
+peopleView.addEventListener(
+  "touchstart",
+  (event) => {
+    if (!session || event.touches.length !== 1) {
+      return;
+    }
+
+    swipeTracking = true;
+    swipeStartX = event.touches[0].clientX;
+  },
+  { passive: true },
+);
+
+peopleView.addEventListener(
+  "touchend",
+  (event) => {
+    if (!swipeTracking || !session || event.changedTouches.length !== 1) {
+      swipeTracking = false;
+      return;
+    }
+
+    const deltaX = event.changedTouches[0].clientX - swipeStartX;
+    swipeTracking = false;
+
+    if (Math.abs(deltaX) < 56) {
+      return;
+    }
+
+    if (deltaX > 0) {
+      setActivePane("chat");
+      return;
+    }
+
+    setActivePane("people");
+  },
+  { passive: true },
+);
 
 document.addEventListener("click", (event) => {
   if (

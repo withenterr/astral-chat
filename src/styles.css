@@ -469,6 +469,7 @@ input:focus {
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .people-phone {
