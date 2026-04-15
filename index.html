@@ -95,13 +95,14 @@
 
         <form id="log-in-form" class="stack auth-form">
           <label class="field">
-            <span>Email</span>
+            <span>Username</span>
             <input
               id="log-in-username"
-              name="email"
-              type="email"
-              placeholder="Your email"
-              autocomplete="email"
+              name="username"
+              type="text"
+              maxlength="24"
+              placeholder="Your username"
+              autocomplete="username"
               required
             />
           </label>
@@ -116,18 +117,19 @@
               required
             />
           </label>
-          <button class="primary-button" type="submit">Log In</button>
+          <button id="log-in-submit-button" class="primary-button" type="submit">Log In</button>
         </form>
 
         <form id="sign-up-form" class="stack auth-form is-hidden">
           <label class="field">
-            <span>Email</span>
+            <span>Username</span>
             <input
               id="sign-up-username"
-              name="email"
-              type="email"
-              placeholder="Your email"
-              autocomplete="email"
+              name="username"
+              type="text"
+              maxlength="24"
+              placeholder="Choose a username"
+              autocomplete="username"
               required
             />
           </label>

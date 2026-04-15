@@ -1,13 +1,15 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://your-project.supabase.co';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'your-anon-key';
+// Your actual Supabase project credentials
+const supabaseUrl = process.env.SUPABASE_URL || 'https://opxggqwvyturntszaiti.supabase.co';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9weWdncXd2eXR1bnRzdHphaXRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYxOTk5MzEsImV4cCI6MTc3NjI4MzMzMX0.YZTdzhEUvsOpam1jVJyuma6iaeyJ384N28nFWoamDao';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
     detectSessionInUrl: true,
-    flow: 'pkce', // Recommended for web apps
+    flow: 'pkce', // Use PKCE for better security
+    debug: true, // Enable debug to see what's happening
   },
 });

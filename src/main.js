@@ -202,6 +202,12 @@ function setAuthMode(mode) {
   signUpTab.setAttribute("aria-selected", String(!isLogIn));
   setAuthStatus("");
 
+  // Update button text based on mode
+  const logInSubmitButton = document.querySelector("#log-in-submit-button");
+  if (logInSubmitButton) {
+    logInSubmitButton.textContent = isLogIn ? "Log In" : "Sign Up";
+  }
+
   if (isLogIn) {
     logInUsernameInput.focus();
     return;
@@ -581,10 +587,13 @@ async function joinChat(username) {
 async function authenticateAndJoin(authFunction, username, password) {
   try {
     const { user, session } = await authFunction(username, password);
-    if (!user || !session) {
-      throw new Error("Authentication failed");
+    if (!user) {
+      throw new Error("Authentication failed - no user returned");
     }
-    await joinChat(user.email || username);
+    
+    // Use the username from the user object (which we set in auth.js)
+    const displayUsername = user.username || username;
+    await joinChat(displayUsername);
   } catch (error) {
     console.error("Auth error:", error);
     throw error;
@@ -626,21 +635,35 @@ async function leaveChat() {
   }
 }
 
-async function checkUsernameAvailability(email) {
-  const normalizedEmail = email.trim();
+async function checkUsernameAvailability(username) {
+  const normalizedUsername = username.trim();
   const requestId = ++availabilityRequestId;
 
-  if (!normalizedEmail) {
+  if (!normalizedUsername) {
     signUpUsernameAvailable = false;
     setUsernameStatus("");
     syncCreateAccountState();
     return;
   }
 
-  // Basic email validation
-  if (!normalizedEmail.includes('@') || !normalizedEmail.includes('.')) {
+  // Basic username validation
+  if (normalizedUsername.length < 3) {
     signUpUsernameAvailable = false;
-    setUsernameStatus("Invalid email", "error");
+    setUsernameStatus("Username too short (min 3 chars)", "error");
+    syncCreateAccountState();
+    return;
+  }
+
+  if (normalizedUsername.length > 24) {
+    signUpUsernameAvailable = false;
+    setUsernameStatus("Username too long (max 24 chars)", "error");
+    syncCreateAccountState();
+    return;
+  }
+
+  if (!/^[a-zA-Z0-9_]+$/.test(normalizedUsername)) {
+    signUpUsernameAvailable = false;
+    setUsernameStatus("Only letters, numbers, and underscores", "error");
     syncCreateAccountState();
     return;
   }
@@ -668,38 +691,45 @@ backToChat.addEventListener("click", () => {
   setActivePane("chat");
 });
 
-logInForm.addEventListener("submit", async (event) => {
+// Unified form submission handler
+async function handleAuthSubmit(event, isSignUp) {
   event.preventDefault();
   setAuthStatus("");
 
-  try {
-    await authenticateAndJoin(signIn, logInUsernameInput.value, logInPasswordInput.value);
-  } catch (error) {
-    setAuthStatus(error.message || "No such account.", true);
-  }
-});
+  const usernameInput = isSignUp ? signUpUsernameInput : logInUsernameInput;
+  const passwordInput = isSignUp ? signUpPasswordInput : logInPasswordInput;
 
-signUpForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
-  setAuthStatus("");
-
-  if (createAccountButton.disabled) {
+  if (isSignUp && createAccountButton.disabled) {
     return;
   }
 
   try {
-    await authenticateAndJoin(signUp, signUpUsernameInput.value, signUpPasswordInput.value);
+    const authFunction = isSignUp ? signUp : signIn;
+    await authenticateAndJoin(authFunction, usernameInput.value, passwordInput.value);
   } catch (error) {
-    if ((error.message || "").toLowerCase().includes("already registered") || 
-        (error.message || "").toLowerCase().includes("user already registered")) {
-      signUpUsernameAvailable = false;
-      setUsernameStatus("Used", "error");
-      syncCreateAccountState();
-      return;
+    console.error("Auth submission error:", error);
+    
+    if (isSignUp) {
+      if ((error.message || "").toLowerCase().includes("already registered") || 
+          (error.message || "").toLowerCase().includes("user already registered") ||
+          (error.message || "").toLowerCase().includes("duplicate")) {
+        signUpUsernameAvailable = false;
+        setUsernameStatus("Used", "error");
+        syncCreateAccountState();
+        return;
+      }
     }
 
-    setAuthStatus(error.message || "Unable to create account.", true);
+    setAuthStatus(error.message || (isSignUp ? "Unable to create account." : "No such account."), true);
   }
+}
+
+logInForm.addEventListener("submit", async (event) => {
+  await handleAuthSubmit(event, authMode === "sign-up");
+});
+
+signUpForm.addEventListener("submit", async (event) => {
+  await handleAuthSubmit(event, true);
 });
 
 signUpUsernameInput.addEventListener("input", () => {
@@ -976,23 +1006,31 @@ document.addEventListener("keydown", (event) => {
 // Initialize authentication state
 async function initializeAuth() {
   try {
-    const { data: { session } } = await getCurrentSession();
-    if (session?.user) {
-      // User is already logged in
-      await joinChat(session.user.email || session.user.user_metadata?.username || 'User');
+    console.log("Initializing auth...");
+    const currentSession = await getCurrentSession();
+    if (currentSession?.user) {
+      // User is already logged in - use username from session
+      const username = currentSession.user.username || 'User';
+      console.log("Found existing session for user:", username);
+      await joinChat(username);
+    } else {
+      console.log("No existing session found");
     }
   } catch (error) {
-    console.log("No active session found");
+    console.error("Auth initialization error:", error);
   }
 }
 
 // Monitor auth state changes
-onAuthStateChange(async (event, session) => {
-  console.log("Auth state changed:", event, session);
+const { data } = onAuthStateChange(async (event, session) => {
+  console.log("Auth state changed:", event, session?.user?.username);
   
   if (event === 'SIGNED_IN' && session?.user) {
-    await joinChat(session.user.email || session.user.user_metadata?.username || 'User');
+    const username = session.user.username || 'User';
+    console.log("User signed in:", username);
+    await joinChat(username);
   } else if (event === 'SIGNED_OUT') {
+    console.log("User signed out");
     clearRealtime();
     session = null;
     toggleViews(false);
