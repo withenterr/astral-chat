@@ -1,4 +1,7 @@
+import { signIn, signUp, signOut, getCurrentUser, getCurrentSession, onAuthStateChange } from "./auth.js";
+
 const STORAGE_KEY = "world-chat-username";
+const AUTH_STORAGE_KEY = "supabase.auth.token";
 const THEME_KEY = "world-chat-theme";
 const PING_MS = 15_000;
 
@@ -575,9 +578,17 @@ async function joinChat(username) {
   messageInput.focus();
 }
 
-async function authenticateAndJoin(endpoint, username, password) {
-  const payload = await postJson(endpoint, { username, password });
-  await joinChat(payload.account.username);
+async function authenticateAndJoin(authFunction, username, password) {
+  try {
+    const { user, session } = await authFunction(username, password);
+    if (!user || !session) {
+      throw new Error("Authentication failed");
+    }
+    await joinChat(user.email || username);
+  } catch (error) {
+    console.error("Auth error:", error);
+    throw error;
+  }
 }
 
 async function leaveChat() {
@@ -609,50 +620,36 @@ async function leaveChat() {
   }
 
   try {
-    await postJson("/api/auth/sign-out", {}, true);
+    await signOut();
   } catch {
     // Best effort only.
   }
 }
 
-async function checkUsernameAvailability(username) {
-  const normalizedUsername = username.trim();
+async function checkUsernameAvailability(email) {
+  const normalizedEmail = email.trim();
   const requestId = ++availabilityRequestId;
 
-  if (!normalizedUsername) {
+  if (!normalizedEmail) {
     signUpUsernameAvailable = false;
     setUsernameStatus("");
     syncCreateAccountState();
     return;
   }
 
-  try {
-    const url = new URL("/api/auth/availability", window.location.origin);
-    url.searchParams.set("username", normalizedUsername);
-    const payload = await fetchJson(url);
-
-    if (requestId !== availabilityRequestId) {
-      return;
-    }
-
-    signUpUsernameAvailable = Boolean(payload.available);
-
-    if (payload.available) {
-      setUsernameStatus("Available", "success");
-    } else {
-      setUsernameStatus("Used", "error");
-    }
-
-    syncCreateAccountState();
-  } catch {
-    if (requestId !== availabilityRequestId) {
-      return;
-    }
-
+  // Basic email validation
+  if (!normalizedEmail.includes('@') || !normalizedEmail.includes('.')) {
     signUpUsernameAvailable = false;
-    setUsernameStatus("Unable to check right now.", "error");
+    setUsernameStatus("Invalid email", "error");
     syncCreateAccountState();
+    return;
   }
+
+  // For Supabase, we can't check availability without attempting signup
+  // So we'll mark it as available and let the signup process handle errors
+  signUpUsernameAvailable = true;
+  setUsernameStatus("Available", "success");
+  syncCreateAccountState();
 }
 
 logInTab.addEventListener("click", () => {
@@ -676,7 +673,7 @@ logInForm.addEventListener("submit", async (event) => {
   setAuthStatus("");
 
   try {
-    await authenticateAndJoin("/api/auth/sign-in", logInUsernameInput.value, logInPasswordInput.value);
+    await authenticateAndJoin(signIn, logInUsernameInput.value, logInPasswordInput.value);
   } catch (error) {
     setAuthStatus(error.message || "No such account.", true);
   }
@@ -691,9 +688,10 @@ signUpForm.addEventListener("submit", async (event) => {
   }
 
   try {
-    await authenticateAndJoin("/api/auth/sign-up", signUpUsernameInput.value, signUpPasswordInput.value);
+    await authenticateAndJoin(signUp, signUpUsernameInput.value, signUpPasswordInput.value);
   } catch (error) {
-    if ((error.message || "").toLowerCase() === "used") {
+    if ((error.message || "").toLowerCase().includes("already registered") || 
+        (error.message || "").toLowerCase().includes("user already registered")) {
       signUpUsernameAvailable = false;
       setUsernameStatus("Used", "error");
       syncCreateAccountState();
@@ -975,6 +973,38 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+// Initialize authentication state
+async function initializeAuth() {
+  try {
+    const { data: { session } } = await getCurrentSession();
+    if (session?.user) {
+      // User is already logged in
+      await joinChat(session.user.email || session.user.user_metadata?.username || 'User');
+    }
+  } catch (error) {
+    console.log("No active session found");
+  }
+}
+
+// Monitor auth state changes
+onAuthStateChange(async (event, session) => {
+  console.log("Auth state changed:", event, session);
+  
+  if (event === 'SIGNED_IN' && session?.user) {
+    await joinChat(session.user.email || session.user.user_metadata?.username || 'User');
+  } else if (event === 'SIGNED_OUT') {
+    clearRealtime();
+    session = null;
+    toggleViews(false);
+    resetChatView();
+    resetAuthForms();
+    setMenuOpen(false);
+    setRedeemStatus("");
+    setAuthStatus("");
+    setAuthMode("log-in");
+  }
+});
+
 applyTheme(getPreferredTheme(), false);
 setAuthMode("log-in");
 toggleViews(false);
@@ -982,6 +1012,9 @@ setActivePane("chat");
 syncOptionState();
 resetAuthForms();
 syncComposerState();
+
+// Initialize auth on page load
+initializeAuth();
 
 window.addEventListener("beforeunload", () => {
   if (!session) {
