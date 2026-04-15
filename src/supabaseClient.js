@@ -8,8 +8,8 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-    flow: 'pkce', // Use PKCE for better security
+    detectSessionInUrl: false, // Disable URL detection for our app
+    flow: 'implicit', // Use implicit flow for immediate auth
     debug: true, // Enable debug to see what's happening
   },
 });
