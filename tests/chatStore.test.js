@@ -38,6 +38,28 @@ test("addMessage stores a trimmed chat message for the joined user", () => {
   assert.equal(message.text, "Hello world");
 });
 
+test("setTyping exposes typing participants and addMessage clears typing", () => {
+  const store = createDeterministicStore();
+  const { session } = store.join("Bob");
+
+  assert.equal(store.setTyping(session.id, true), true);
+  assert.equal(store.getSnapshot().typingParticipants[0].name, "Bob");
+
+  store.addMessage(session.id, "hello");
+
+  assert.equal(store.getSnapshot().typingParticipants.length, 0);
+});
+
+test("clearExpiredTyping removes stale typing state", () => {
+  const store = createDeterministicStore();
+  const { session } = store.join("Ava");
+
+  store.setTyping(session.id, true);
+
+  assert.equal(store.clearExpiredTyping(0), true);
+  assert.equal(store.getSnapshot().typingParticipants.length, 0);
+});
+
 test("join rejects duplicate names even with different casing", () => {
   const store = createDeterministicStore();
 

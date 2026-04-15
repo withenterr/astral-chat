@@ -164,24 +164,91 @@
             <span id="online-count" class="count-pill">0 online</span>
           </header>
 
-          <section class="chat-people" aria-label="People here">
-            <ul id="participant-list" class="participant-list"></ul>
+          <div class="chat-switcher" role="tablist" aria-label="Chat views">
+            <button
+              id="chat-pane-tab"
+              class="secondary-button chat-switcher-tab chat-switcher-tab--active"
+              type="button"
+              aria-selected="true"
+            >
+              Chat
+            </button>
+            <button
+              id="people-pane-tab"
+              class="secondary-button chat-switcher-tab"
+              type="button"
+              aria-selected="false"
+            >
+              People
+            </button>
+          </div>
+
+          <p id="typing-indicator" class="typing-indicator is-hidden" aria-live="polite"></p>
+
+          <section id="chat-pager" class="chat-pager" data-pane="chat">
+            <div class="chat-pane chat-pane--messages">
+              <div id="message-list" class="message-list" aria-live="polite"></div>
+            </div>
+            <div class="chat-pane chat-pane--people">
+              <section class="chat-people" aria-label="People here">
+                <p class="people-title">People Here</p>
+                <ul id="participant-list" class="participant-list participant-list--stacked"></ul>
+              </section>
+            </div>
           </section>
 
-          <div id="message-list" class="message-list" aria-live="polite"></div>
+          <input id="camera-input" class="sr-only" type="file" accept="image/*" capture="environment" />
+          <input id="gallery-input" class="sr-only" type="file" accept="image/*" />
+          <p id="composer-status" class="composer-status is-hidden" aria-live="polite"></p>
 
-          <form id="message-form" class="composer">
-            <label class="sr-only" for="message-input">Message</label>
-            <input
-              id="message-input"
-              name="message"
-              type="text"
-              maxlength="280"
-              placeholder="Say something..."
-              autocomplete="off"
-              required
-            />
-            <button class="primary-button composer-send" type="submit">Send</button>
+          <form id="message-form" class="composer composer-floating">
+            <button
+              id="camera-button"
+              class="secondary-button composer-icon"
+              type="button"
+              aria-label="Open camera"
+            >
+              <span aria-hidden="true">📷</span>
+            </button>
+            <button
+              id="gallery-button"
+              class="secondary-button composer-icon"
+              type="button"
+              aria-label="Open gallery"
+            >
+              <span aria-hidden="true">🖼</span>
+            </button>
+            <div class="composer-input-wrap">
+              <button
+                id="emoji-button"
+                class="secondary-button composer-icon composer-icon--inline"
+                type="button"
+                aria-label="Add emoji"
+              >
+                <span aria-hidden="true">😊</span>
+              </button>
+              <label class="sr-only" for="message-input">Message</label>
+              <input
+                id="message-input"
+                name="message"
+                type="text"
+                maxlength="280"
+                placeholder="Say something..."
+                autocomplete="off"
+                required
+              />
+            </div>
+            <button
+              id="voice-button"
+              class="secondary-button composer-icon composer-icon--voice"
+              type="button"
+              aria-label="Hold to record voice message"
+            >
+              <span aria-hidden="true">🎙</span>
+            </button>
+            <button class="primary-button composer-send" type="submit" aria-label="Send message">
+              <span aria-hidden="true">➜</span>
+            </button>
           </form>
         </section>
       </section>

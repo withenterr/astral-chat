@@ -20,6 +20,7 @@ const ACCOUNT_DATA_PATH = join(ROOT, "data", "accounts.json");
 const ACCOUNT_SWEEP_MS = 60 * 60 * 1000;
 const PRESENCE_MAX_IDLE_MS = 30_000;
 const PRESENCE_SWEEP_MS = 10_000;
+const TYPING_MAX_IDLE_MS = 2_500;
 const ADMIN_REDEEM_CODE_HASH =
   process.env.ADMIN_REDEEM_CODE_HASH ||
   "2030f95dcd3e609feefdace6b70ad33cb5573c2efbc8ccbe95e56f9e9adde21f";
@@ -187,9 +188,17 @@ function serveStatic(request, response) {
 
 function cleanupInactiveSessions() {
   const timedOutEvents = store.removeInactiveSessions(PRESENCE_MAX_IDLE_MS);
+  const typingChanged = store.clearExpiredTyping(TYPING_MAX_IDLE_MS);
 
   if (timedOutEvents.length > 0) {
     broadcast(timedOutEvents[timedOutEvents.length - 1]);
+    return;
+  }
+
+  if (typingChanged) {
+    broadcast({
+      type: "typing",
+    });
   }
 }
 
@@ -271,6 +280,23 @@ const server = http.createServer(async (request, response) => {
       const event = store.addMessage(sessionId, text);
       sendJson(response, 200, { ok: true });
       broadcast(event);
+    } catch (error) {
+      sendJson(response, 400, { error: error.message });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/typing") {
+    try {
+      const { sessionId, typing } = await readBody(request);
+      const changed = store.setTyping(sessionId, typing);
+      sendJson(response, 200, { ok: true });
+
+      if (changed) {
+        broadcast({
+          type: "typing",
+        });
+      }
     } catch (error) {
       sendJson(response, 400, { error: error.message });
     }

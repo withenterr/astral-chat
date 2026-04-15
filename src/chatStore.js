@@ -68,6 +68,10 @@ export function createChatStore({
     return {
       onlineCount: participants.length,
       participants,
+      typingParticipants: [...sessions.values()]
+        .filter((session) => session.isTyping)
+        .map(serializeSession)
+        .sort((first, second) => first.name.localeCompare(second.name)),
       messages: messages.map((message) => ({ ...message })),
     };
   }
@@ -92,7 +96,9 @@ export function createChatStore({
       name: normalizedName,
       role: ROLE_MEMBER,
       isMuted: false,
+      isTyping: false,
       lastSeenAt: clock(),
+      typingUpdatedAt: 0,
     };
     sessions.set(session.id, session);
     return session;
@@ -152,6 +158,8 @@ export function createChatStore({
     }
 
     session.lastSeenAt = clock();
+    session.isTyping = false;
+    session.typingUpdatedAt = 0;
     const message = buildChatMessage(session.name, normalizedText, idGenerator, clock);
     message.role = session.role;
     pushMessage(message);
@@ -175,6 +183,33 @@ export function createChatStore({
     const event = buildSystemMessage(`${session.name} is now an admin.`, idGenerator, clock);
     pushMessage(event);
     return { session: serializeSession(session), event };
+  }
+
+  function setTyping(sessionId, typing) {
+    const session = getSessionOrThrow(sessionId);
+    const normalizedTyping = Boolean(typing);
+    const changed = session.isTyping !== normalizedTyping;
+
+    session.isTyping = normalizedTyping;
+    session.typingUpdatedAt = normalizedTyping ? clock() : 0;
+    session.lastSeenAt = clock();
+
+    return changed;
+  }
+
+  function clearExpiredTyping(maxIdleMs) {
+    const now = clock();
+    let changed = false;
+
+    for (const session of sessions.values()) {
+      if (session.isTyping && now - session.typingUpdatedAt > maxIdleMs) {
+        session.isTyping = false;
+        session.typingUpdatedAt = 0;
+        changed = true;
+      }
+    }
+
+    return changed;
   }
 
   function setMuted(actorSessionId, targetSessionId, muted) {
@@ -238,6 +273,7 @@ export function createChatStore({
 
   return {
     addMessage,
+    clearExpiredTyping,
     grantRole,
     getSnapshot,
     hasSession,
@@ -245,6 +281,7 @@ export function createChatStore({
     kick,
     leave,
     removeInactiveSessions,
+    setTyping,
     setMuted,
     touchSession,
   };

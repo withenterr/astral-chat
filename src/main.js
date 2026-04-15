@@ -8,6 +8,9 @@ const menuToggle = document.querySelector("#menu-toggle");
 const optionsMenu = document.querySelector("#options-menu");
 const authView = document.querySelector("#auth-view");
 const chatView = document.querySelector("#chat-view");
+const chatPaneTab = document.querySelector("#chat-pane-tab");
+const peoplePaneTab = document.querySelector("#people-pane-tab");
+const chatPager = document.querySelector("#chat-pager");
 const logInTab = document.querySelector("#log-in-tab");
 const signUpTab = document.querySelector("#sign-up-tab");
 const logInForm = document.querySelector("#log-in-form");
@@ -23,9 +26,17 @@ const messageForm = document.querySelector("#message-form");
 const messageInput = document.querySelector("#message-input");
 const messageList = document.querySelector("#message-list");
 const participantList = document.querySelector("#participant-list");
+const typingIndicator = document.querySelector("#typing-indicator");
 const roomName = document.querySelector("#room-name");
 const onlineCount = document.querySelector("#online-count");
 const connectionStatus = document.querySelector("#connection-status");
+const cameraInput = document.querySelector("#camera-input");
+const galleryInput = document.querySelector("#gallery-input");
+const cameraButton = document.querySelector("#camera-button");
+const galleryButton = document.querySelector("#gallery-button");
+const emojiButton = document.querySelector("#emoji-button");
+const voiceButton = document.querySelector("#voice-button");
+const composerStatus = document.querySelector("#composer-status");
 const redeemToggle = document.querySelector("#redeem-toggle");
 const redeemForm = document.querySelector("#redeem-form");
 const redeemInput = document.querySelector("#redeem-input");
@@ -39,6 +50,15 @@ let pingTimer = null;
 let authMode = "log-in";
 let signUpUsernameAvailable = false;
 let availabilityRequestId = 0;
+let activePane = "chat";
+let composerStatusTimer = null;
+let localTyping = false;
+let lastSnapshot = null;
+let swipeStartX = 0;
+let swipeTracking = false;
+let typingResetTimer = null;
+let typingSent = false;
+let voiceHoldActive = false;
 
 const storedUsername = localStorage.getItem(STORAGE_KEY) || "";
 logInUsernameInput.value = storedUsername;
@@ -117,6 +137,15 @@ function setMenuOpen(isOpen) {
   menuToggle.setAttribute("aria-expanded", String(isOpen));
 }
 
+function setActivePane(pane) {
+  activePane = pane;
+  chatPager.dataset.pane = pane;
+  chatPaneTab.classList.toggle("chat-switcher-tab--active", pane === "chat");
+  peoplePaneTab.classList.toggle("chat-switcher-tab--active", pane === "people");
+  chatPaneTab.setAttribute("aria-selected", String(pane === "chat"));
+  peoplePaneTab.setAttribute("aria-selected", String(pane === "people"));
+}
+
 function isCurrentUserAdmin() {
   return session?.role === "admin";
 }
@@ -130,6 +159,27 @@ function toggleViews(isInChat) {
   authView.classList.toggle("is-hidden", isInChat);
   chatView.classList.toggle("is-hidden", !isInChat);
   syncOptionState();
+}
+
+function setComposerStatus(message) {
+  if (composerStatusTimer) {
+    window.clearTimeout(composerStatusTimer);
+    composerStatusTimer = null;
+  }
+
+  if (!message) {
+    composerStatus.textContent = "";
+    composerStatus.classList.add("is-hidden");
+    return;
+  }
+
+  composerStatus.textContent = message;
+  composerStatus.classList.remove("is-hidden");
+  composerStatusTimer = window.setTimeout(() => {
+    composerStatus.textContent = "";
+    composerStatus.classList.add("is-hidden");
+    composerStatusTimer = null;
+  }, 1800);
 }
 
 function setAuthMode(mode) {
@@ -265,7 +315,28 @@ function renderMessages(messages) {
   messageList.scrollTop = messageList.scrollHeight;
 }
 
+function renderTypingIndicator(snapshot = lastSnapshot) {
+  const typingParticipants = snapshot?.typingParticipants || [];
+  const otherTypingNames = typingParticipants
+    .filter((participant) => participant.id !== session?.id)
+    .map((participant) => participant.name);
+
+  let message = "";
+
+  if (otherTypingNames.length === 1) {
+    message = `${otherTypingNames[0]} is typing...`;
+  } else if (otherTypingNames.length > 1) {
+    message = `${otherTypingNames.slice(0, 2).join(" and ")} are typing...`;
+  } else if (localTyping) {
+    message = "typing...";
+  }
+
+  typingIndicator.textContent = message;
+  typingIndicator.classList.toggle("is-hidden", !message);
+}
+
 function renderSnapshot(payload) {
+  lastSnapshot = payload.snapshot;
   roomName.textContent = payload.roomName;
   onlineCount.textContent = `${payload.snapshot.onlineCount} online`;
 
@@ -283,6 +354,7 @@ function renderSnapshot(payload) {
 
   renderParticipants(payload.snapshot.participants);
   renderMessages(payload.snapshot.messages);
+  renderTypingIndicator(payload.snapshot);
   syncOptionState();
 }
 
@@ -323,6 +395,60 @@ async function fetchJson(url) {
   return data;
 }
 
+async function postTypingState(typing) {
+  if (!session) {
+    return;
+  }
+
+  try {
+    await postJson("/api/typing", {
+      sessionId: session.id,
+      typing,
+    });
+  } catch {
+    // Best effort only.
+  }
+}
+
+function syncComposerState() {
+  const hasText = messageInput.value.trim().length > 0;
+  localTyping = hasText;
+  renderTypingIndicator();
+
+  if (!session) {
+    return;
+  }
+
+  if (typingResetTimer) {
+    window.clearTimeout(typingResetTimer);
+    typingResetTimer = null;
+  }
+
+  if (hasText) {
+    if (!typingSent) {
+      typingSent = true;
+      postTypingState(true);
+    }
+
+    typingResetTimer = window.setTimeout(() => {
+      localTyping = false;
+      renderTypingIndicator();
+
+      if (typingSent) {
+        typingSent = false;
+        postTypingState(false);
+      }
+    }, 1400);
+
+    return;
+  }
+
+  if (typingSent) {
+    typingSent = false;
+    postTypingState(false);
+  }
+}
+
 function clearRealtime() {
   if (eventSource) {
     eventSource.close();
@@ -332,6 +458,11 @@ function clearRealtime() {
   if (pingTimer) {
     window.clearInterval(pingTimer);
     pingTimer = null;
+  }
+
+  if (typingResetTimer) {
+    window.clearTimeout(typingResetTimer);
+    typingResetTimer = null;
   }
 }
 
@@ -348,6 +479,13 @@ function resetChatView() {
   messageList.innerHTML = "";
   onlineCount.textContent = "0 online";
   connectionStatus.textContent = "Disconnected";
+  lastSnapshot = null;
+  localTyping = false;
+  typingSent = false;
+  voiceHoldActive = false;
+  renderTypingIndicator(null);
+  setComposerStatus("");
+  setActivePane("chat");
 }
 
 function handleForcedLogout(message) {
@@ -405,10 +543,12 @@ async function joinChat(username) {
   logInUsernameInput.value = session.name;
   signUpUsernameInput.value = session.name;
   toggleViews(true);
+  setActivePane("chat");
   setMenuOpen(false);
   setAuthStatus("");
   setRedeemStatus("");
   renderSnapshot(payload);
+  syncComposerState();
   openRealtimeChannel();
   messageInput.focus();
 }
@@ -424,6 +564,12 @@ async function leaveChat() {
   }
 
   const sessionId = session.id;
+  const shouldClearTyping = typingSent;
+
+  if (shouldClearTyping) {
+    postTypingState(false);
+  }
+
   clearRealtime();
   session = null;
   toggleViews(false);
@@ -495,6 +641,14 @@ signUpTab.addEventListener("click", () => {
   setAuthMode("sign-up");
 });
 
+chatPaneTab.addEventListener("click", () => {
+  setActivePane("chat");
+});
+
+peoplePaneTab.addEventListener("click", () => {
+  setActivePane("people");
+});
+
 logInForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   setAuthStatus("");
@@ -541,6 +695,63 @@ logInUsernameInput.addEventListener("input", () => {
   setAuthStatus("");
 });
 
+messageInput.addEventListener("input", () => {
+  syncComposerState();
+});
+
+cameraButton.addEventListener("click", () => {
+  cameraInput.click();
+});
+
+galleryButton.addEventListener("click", () => {
+  galleryInput.click();
+});
+
+cameraInput.addEventListener("change", () => {
+  if (cameraInput.files?.length) {
+    setComposerStatus("Camera picked. Media sending is coming next.");
+  }
+});
+
+galleryInput.addEventListener("change", () => {
+  if (galleryInput.files?.length) {
+    setComposerStatus("Gallery picked. Media sending is coming next.");
+  }
+});
+
+emojiButton.addEventListener("click", () => {
+  const nextValue = `${messageInput.value}${messageInput.value ? " " : ""}😊`;
+  messageInput.value = nextValue.slice(0, Number(messageInput.maxLength || 280));
+  syncComposerState();
+  messageInput.focus();
+});
+
+function startVoiceHold() {
+  voiceHoldActive = true;
+  voiceButton.classList.add("composer-icon--recording");
+  composerStatus.textContent = "Recording voice... release when ready.";
+  composerStatus.classList.remove("is-hidden");
+}
+
+function stopVoiceHold() {
+  if (!voiceHoldActive) {
+    return;
+  }
+
+  voiceHoldActive = false;
+  voiceButton.classList.remove("composer-icon--recording");
+  setComposerStatus("Voice hold ready. Voice sending can be wired next.");
+}
+
+voiceButton.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  startVoiceHold();
+});
+
+voiceButton.addEventListener("pointerup", stopVoiceHold);
+voiceButton.addEventListener("pointerleave", stopVoiceHold);
+voiceButton.addEventListener("pointercancel", stopVoiceHold);
+
 messageForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -554,6 +765,19 @@ messageForm.addEventListener("submit", async (event) => {
       text: messageInput.value,
     });
     messageInput.value = "";
+    localTyping = false;
+    renderTypingIndicator();
+
+    if (typingSent) {
+      typingSent = false;
+      postTypingState(false);
+    }
+
+    if (typingResetTimer) {
+      window.clearTimeout(typingResetTimer);
+      typingResetTimer = null;
+    }
+
     messageInput.focus();
   } catch (error) {
     window.alert(error.message);
@@ -634,6 +858,44 @@ participantList.addEventListener("click", async (event) => {
   }
 });
 
+chatPager.addEventListener(
+  "touchstart",
+  (event) => {
+    if (!session || event.touches.length !== 1) {
+      return;
+    }
+
+    swipeTracking = true;
+    swipeStartX = event.touches[0].clientX;
+  },
+  { passive: true },
+);
+
+chatPager.addEventListener(
+  "touchend",
+  (event) => {
+    if (!swipeTracking || !session || event.changedTouches.length !== 1) {
+      swipeTracking = false;
+      return;
+    }
+
+    const deltaX = event.changedTouches[0].clientX - swipeStartX;
+    swipeTracking = false;
+
+    if (Math.abs(deltaX) < 56) {
+      return;
+    }
+
+    if (deltaX < 0) {
+      setActivePane("people");
+      return;
+    }
+
+    setActivePane("chat");
+  },
+  { passive: true },
+);
+
 document.addEventListener("click", (event) => {
   if (
     bodyElement.classList.contains("menu-open") &&
@@ -653,8 +915,10 @@ document.addEventListener("keydown", (event) => {
 applyTheme(getPreferredTheme(), false);
 setAuthMode("log-in");
 toggleViews(false);
+setActivePane("chat");
 syncOptionState();
 resetAuthForms();
+syncComposerState();
 
 window.addEventListener("beforeunload", () => {
   if (!session) {
