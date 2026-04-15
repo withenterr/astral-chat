@@ -8,8 +8,11 @@ const menuToggle = document.querySelector("#menu-toggle");
 const optionsMenu = document.querySelector("#options-menu");
 const authView = document.querySelector("#auth-view");
 const chatView = document.querySelector("#chat-view");
-const chatPaneTab = document.querySelector("#chat-pane-tab");
-const peoplePaneTab = document.querySelector("#people-pane-tab");
+const peopleButton = document.querySelector("#people-button");
+const backToChat = document.querySelector("#back-to-chat");
+const peopleView = document.querySelector("#people-view");
+const peopleOnlineCount = document.querySelector("#people-online-count");
+const peopleParticipantList = document.querySelector("#people-participant-list");
 const chatPager = document.querySelector("#chat-pager");
 const logInTab = document.querySelector("#log-in-tab");
 const signUpTab = document.querySelector("#sign-up-tab");
@@ -139,11 +142,13 @@ function setMenuOpen(isOpen) {
 
 function setActivePane(pane) {
   activePane = pane;
-  chatPager.dataset.pane = pane;
-  chatPaneTab.classList.toggle("chat-switcher-tab--active", pane === "chat");
-  peoplePaneTab.classList.toggle("chat-switcher-tab--active", pane === "people");
-  chatPaneTab.setAttribute("aria-selected", String(pane === "chat"));
-  peoplePaneTab.setAttribute("aria-selected", String(pane === "people"));
+  if (pane === "chat") {
+    chatView.classList.remove("is-hidden");
+    peopleView.classList.add("is-hidden");
+  } else if (pane === "people") {
+    chatView.classList.add("is-hidden");
+    peopleView.classList.remove("is-hidden");
+  }
 }
 
 function isCurrentUserAdmin() {
@@ -211,7 +216,21 @@ function syncCreateAccountState() {
 }
 
 function renderParticipants(participants) {
-  participantList.innerHTML = "";
+  // Render in both chat and people views
+  renderParticipantsInList(participantList, participants);
+  renderParticipantsInList(peopleParticipantList, participants);
+}
+
+function renderParticipantsInList(listElement, participants) {
+  listElement.innerHTML = "";
+
+  if (participants.length === 0) {
+    const emptyItem = document.createElement("li");
+    emptyItem.className = "participant-item";
+    emptyItem.innerHTML = `<div class="participant-details"><div class="participant-name-row"><span class="participant-name">No users online</span></div></div>`;
+    listElement.append(emptyItem);
+    return;
+  }
 
   for (const participant of participants) {
     const item = document.createElement("li");
@@ -274,7 +293,7 @@ function renderParticipants(participants) {
       item.append(actions);
     }
 
-    participantList.append(item);
+    listElement.append(item);
   }
 }
 
@@ -339,6 +358,7 @@ function renderSnapshot(payload) {
   lastSnapshot = payload.snapshot;
   roomName.textContent = payload.roomName;
   onlineCount.textContent = `${payload.snapshot.onlineCount} online`;
+  peopleOnlineCount.textContent = `${payload.snapshot.onlineCount} online`;
 
   if (session) {
     const me = payload.snapshot.participants.find((participant) => participant.id === session.id);
@@ -476,8 +496,10 @@ function resetAuthForms() {
 
 function resetChatView() {
   participantList.innerHTML = "";
+  peopleParticipantList.innerHTML = "";
   messageList.innerHTML = "";
   onlineCount.textContent = "0 online";
+  peopleOnlineCount.textContent = "0 online";
   connectionStatus.textContent = "Disconnected";
   lastSnapshot = null;
   localTyping = false;
@@ -641,12 +663,12 @@ signUpTab.addEventListener("click", () => {
   setAuthMode("sign-up");
 });
 
-chatPaneTab.addEventListener("click", () => {
-  setActivePane("chat");
+peopleButton.addEventListener("click", () => {
+  setActivePane("people");
 });
 
-peoplePaneTab.addEventListener("click", () => {
-  setActivePane("people");
+backToChat.addEventListener("click", () => {
+  setActivePane("chat");
 });
 
 logInForm.addEventListener("submit", async (event) => {
@@ -827,7 +849,7 @@ menuLeaveButton.addEventListener("click", () => {
   leaveChat();
 });
 
-participantList.addEventListener("click", async (event) => {
+function handleParticipantAction(event) {
   const button = event.target.closest("[data-action]");
 
   if (!button || !session) {
@@ -839,7 +861,7 @@ participantList.addEventListener("click", async (event) => {
 
   try {
     if (action === "mute") {
-      await postJson("/api/admin/mute", {
+      postJson("/api/admin/mute", {
         sessionId: session.id,
         targetSessionId,
         muted: button.dataset.muted !== "true",
@@ -848,7 +870,7 @@ participantList.addEventListener("click", async (event) => {
     }
 
     if (action === "kick") {
-      await postJson("/api/admin/kick", {
+      postJson("/api/admin/kick", {
         sessionId: session.id,
         targetSessionId,
       });
@@ -856,45 +878,11 @@ participantList.addEventListener("click", async (event) => {
   } catch (error) {
     window.alert(error.message);
   }
-});
+}
 
-chatPager.addEventListener(
-  "touchstart",
-  (event) => {
-    if (!session || event.touches.length !== 1) {
-      return;
-    }
+participantList.addEventListener("click", handleParticipantAction);
+peopleParticipantList.addEventListener("click", handleParticipantAction);
 
-    swipeTracking = true;
-    swipeStartX = event.touches[0].clientX;
-  },
-  { passive: true },
-);
-
-chatPager.addEventListener(
-  "touchend",
-  (event) => {
-    if (!swipeTracking || !session || event.changedTouches.length !== 1) {
-      swipeTracking = false;
-      return;
-    }
-
-    const deltaX = event.changedTouches[0].clientX - swipeStartX;
-    swipeTracking = false;
-
-    if (Math.abs(deltaX) < 56) {
-      return;
-    }
-
-    if (deltaX < 0) {
-      setActivePane("people");
-      return;
-    }
-
-    setActivePane("chat");
-  },
-  { passive: true },
-);
 
 document.addEventListener("click", (event) => {
   if (

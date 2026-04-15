@@ -161,39 +161,24 @@
               <h2 id="room-name">Global Room</h2>
               <p id="connection-status" class="status-line">Disconnected</p>
             </div>
-            <span id="online-count" class="count-pill">0 online</span>
+            <div class="chat-header-nav">
+              <span id="online-count" class="count-pill">0 online</span>
+              <button
+                id="people-button"
+                class="secondary-button header-nav-button"
+                type="button"
+              >
+                People
+              </button>
+            </div>
           </header>
 
-          <div class="chat-switcher" role="tablist" aria-label="Chat views">
-            <button
-              id="chat-pane-tab"
-              class="secondary-button chat-switcher-tab chat-switcher-tab--active"
-              type="button"
-              aria-selected="true"
-            >
-              Chat
-            </button>
-            <button
-              id="people-pane-tab"
-              class="secondary-button chat-switcher-tab"
-              type="button"
-              aria-selected="false"
-            >
-              People
-            </button>
-          </div>
 
           <p id="typing-indicator" class="typing-indicator is-hidden" aria-live="polite"></p>
 
-          <section id="chat-pager" class="chat-pager" data-pane="chat">
+          <section id="chat-pager" class="chat-pager">
             <div class="chat-pane chat-pane--messages">
               <div id="message-list" class="message-list" aria-live="polite"></div>
-            </div>
-            <div class="chat-pane chat-pane--people">
-              <section class="chat-people" aria-label="People here">
-                <p class="people-title">People Here</p>
-                <ul id="participant-list" class="participant-list participant-list--stacked"></ul>
-              </section>
             </div>
           </section>
 
@@ -250,6 +235,31 @@
               <span aria-hidden="true">➜</span>
             </button>
           </form>
+        </section>
+      </section>
+
+      <section id="people-view" class="people-screen is-hidden">
+        <section class="people-phone">
+          <header class="people-header">
+            <div class="people-header-copy">
+              <button
+                id="back-to-chat"
+                class="secondary-button back-button"
+                type="button"
+              >
+                ← Back
+              </button>
+              <h2>People</h2>
+            </div>
+            <span id="people-online-count" class="count-pill">0 online</span>
+          </header>
+          
+          <section class="people-content">
+            <div class="people-section">
+              <p class="people-title">People Here</p>
+              <ul id="people-participant-list" class="participant-list participant-list--stacked"></ul>
+            </div>
+          </section>
         </section>
       </section>
     </main>
