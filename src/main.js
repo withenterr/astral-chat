@@ -1,4 +1,4 @@
-const STORAGE_KEY = "world-chat-name";
+const STORAGE_KEY = "world-chat-username";
 const THEME_KEY = "world-chat-theme";
 const PING_MS = 15_000;
 
@@ -6,10 +6,19 @@ const rootElement = document.documentElement;
 const bodyElement = document.body;
 const menuToggle = document.querySelector("#menu-toggle");
 const optionsMenu = document.querySelector("#options-menu");
-const joinView = document.querySelector("#join-view");
+const authView = document.querySelector("#auth-view");
 const chatView = document.querySelector("#chat-view");
-const joinForm = document.querySelector("#join-form");
-const nameInput = document.querySelector("#name-input");
+const logInTab = document.querySelector("#log-in-tab");
+const signUpTab = document.querySelector("#sign-up-tab");
+const logInForm = document.querySelector("#log-in-form");
+const signUpForm = document.querySelector("#sign-up-form");
+const logInUsernameInput = document.querySelector("#log-in-username");
+const logInPasswordInput = document.querySelector("#log-in-password");
+const signUpUsernameInput = document.querySelector("#sign-up-username");
+const signUpPasswordInput = document.querySelector("#sign-up-password");
+const createAccountButton = document.querySelector("#create-account-button");
+const signUpUsernameStatus = document.querySelector("#sign-up-username-status");
+const authStatus = document.querySelector("#auth-status");
 const messageForm = document.querySelector("#message-form");
 const messageInput = document.querySelector("#message-input");
 const messageList = document.querySelector("#message-list");
@@ -27,8 +36,13 @@ const menuLeaveButton = document.querySelector("#menu-leave-button");
 let session = null;
 let eventSource = null;
 let pingTimer = null;
+let authMode = "log-in";
+let signUpUsernameAvailable = false;
+let availabilityRequestId = 0;
 
-nameInput.value = localStorage.getItem(STORAGE_KEY) || "";
+const storedUsername = localStorage.getItem(STORAGE_KEY) || "";
+logInUsernameInput.value = storedUsername;
+signUpUsernameInput.value = storedUsername;
 
 function getPreferredTheme() {
   const savedTheme = localStorage.getItem(THEME_KEY);
@@ -64,6 +78,36 @@ function setRedeemStatus(message, isError = false) {
   redeemStatus.classList.toggle("is-error", isError);
 }
 
+function setAuthStatus(message, isError = false) {
+  if (!message) {
+    authStatus.textContent = "";
+    authStatus.classList.add("is-hidden");
+    authStatus.classList.remove("is-error");
+    authStatus.classList.remove("is-success");
+    return;
+  }
+
+  authStatus.textContent = message;
+  authStatus.classList.remove("is-hidden");
+  authStatus.classList.toggle("is-error", isError);
+  authStatus.classList.toggle("is-success", !isError);
+}
+
+function setUsernameStatus(message, state = "neutral") {
+  if (!message) {
+    signUpUsernameStatus.textContent = "";
+    signUpUsernameStatus.classList.add("is-hidden");
+    signUpUsernameStatus.classList.remove("is-error");
+    signUpUsernameStatus.classList.remove("is-success");
+    return;
+  }
+
+  signUpUsernameStatus.textContent = message;
+  signUpUsernameStatus.classList.remove("is-hidden");
+  signUpUsernameStatus.classList.toggle("is-error", state === "error");
+  signUpUsernameStatus.classList.toggle("is-success", state === "success");
+}
+
 function setConnectedState(isConnected) {
   connectionStatus.textContent = isConnected ? "Live connection" : "Reconnecting...";
 }
@@ -83,9 +127,37 @@ function syncOptionState() {
 }
 
 function toggleViews(isInChat) {
-  joinView.classList.toggle("is-hidden", isInChat);
+  authView.classList.toggle("is-hidden", isInChat);
   chatView.classList.toggle("is-hidden", !isInChat);
   syncOptionState();
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const isLogIn = mode === "log-in";
+
+  logInForm.classList.toggle("is-hidden", !isLogIn);
+  signUpForm.classList.toggle("is-hidden", isLogIn);
+  logInTab.classList.toggle("auth-tab--active", isLogIn);
+  signUpTab.classList.toggle("auth-tab--active", !isLogIn);
+  logInTab.setAttribute("aria-selected", String(isLogIn));
+  signUpTab.setAttribute("aria-selected", String(!isLogIn));
+  setAuthStatus("");
+
+  if (isLogIn) {
+    logInUsernameInput.focus();
+    return;
+  }
+
+  syncCreateAccountState();
+  signUpUsernameInput.focus();
+}
+
+function syncCreateAccountState() {
+  createAccountButton.disabled =
+    !signUpUsernameInput.value.trim() ||
+    !signUpPasswordInput.value ||
+    !signUpUsernameAvailable;
 }
 
 function renderParticipants(participants) {
@@ -232,6 +304,17 @@ async function postJson(url, payload, keepalive = false) {
   return data;
 }
 
+async function fetchJson(url) {
+  const response = await fetch(url);
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || "Request failed.");
+  }
+
+  return data;
+}
+
 function clearRealtime() {
   if (eventSource) {
     eventSource.close();
@@ -244,17 +327,30 @@ function clearRealtime() {
   }
 }
 
-function handleForcedLogout(message) {
-  clearRealtime();
-  session = null;
-  toggleViews(false);
+function resetAuthForms() {
+  logInPasswordInput.value = "";
+  signUpPasswordInput.value = "";
+  signUpUsernameAvailable = false;
+  setUsernameStatus("");
+  syncCreateAccountState();
+}
+
+function resetChatView() {
   participantList.innerHTML = "";
   messageList.innerHTML = "";
   onlineCount.textContent = "0 online";
   connectionStatus.textContent = "Disconnected";
+}
+
+function handleForcedLogout(message) {
+  clearRealtime();
+  session = null;
+  toggleViews(false);
+  resetChatView();
+  resetAuthForms();
   setMenuOpen(false);
   setRedeemStatus("");
-  window.alert(message);
+  setAuthStatus(message, true);
 }
 
 function openRealtimeChannel() {
@@ -294,16 +390,24 @@ function openRealtimeChannel() {
   }, PING_MS);
 }
 
-async function joinChat(name) {
-  const payload = await postJson("/api/join", { name });
+async function joinChat(username) {
+  const payload = await postJson("/api/join", { name: username });
   session = payload.session;
   localStorage.setItem(STORAGE_KEY, session.name);
+  logInUsernameInput.value = session.name;
+  signUpUsernameInput.value = session.name;
   toggleViews(true);
   setMenuOpen(false);
+  setAuthStatus("");
   setRedeemStatus("");
   renderSnapshot(payload);
   openRealtimeChannel();
   messageInput.focus();
+}
+
+async function authenticateAndJoin(endpoint, username, password) {
+  const payload = await postJson(endpoint, { username, password });
+  await joinChat(payload.account.username);
 }
 
 async function leaveChat() {
@@ -315,28 +419,118 @@ async function leaveChat() {
   clearRealtime();
   session = null;
   toggleViews(false);
-  participantList.innerHTML = "";
-  messageList.innerHTML = "";
-  onlineCount.textContent = "0 online";
-  connectionStatus.textContent = "Disconnected";
+  resetChatView();
+  resetAuthForms();
   setMenuOpen(false);
   setRedeemStatus("");
+  setAuthStatus("");
+  setAuthMode("log-in");
 
   try {
     await postJson("/api/leave", { sessionId }, true);
   } catch {
     // Ignore unload or network errors on leave.
   }
-}
-
-joinForm.addEventListener("submit", async (event) => {
-  event.preventDefault();
 
   try {
-    await joinChat(nameInput.value);
-  } catch (error) {
-    window.alert(error.message);
+    await postJson("/api/auth/sign-out", {}, true);
+  } catch {
+    // Best effort only.
   }
+}
+
+async function checkUsernameAvailability(username) {
+  const normalizedUsername = username.trim();
+  const requestId = ++availabilityRequestId;
+
+  if (!normalizedUsername) {
+    signUpUsernameAvailable = false;
+    setUsernameStatus("");
+    syncCreateAccountState();
+    return;
+  }
+
+  try {
+    const url = new URL("/api/auth/availability", window.location.origin);
+    url.searchParams.set("username", normalizedUsername);
+    const payload = await fetchJson(url);
+
+    if (requestId !== availabilityRequestId) {
+      return;
+    }
+
+    signUpUsernameAvailable = Boolean(payload.available);
+
+    if (payload.available) {
+      setUsernameStatus("Available", "success");
+    } else {
+      setUsernameStatus("Used", "error");
+    }
+
+    syncCreateAccountState();
+  } catch {
+    if (requestId !== availabilityRequestId) {
+      return;
+    }
+
+    signUpUsernameAvailable = false;
+    setUsernameStatus("Unable to check right now.", "error");
+    syncCreateAccountState();
+  }
+}
+
+logInTab.addEventListener("click", () => {
+  setAuthMode("log-in");
+});
+
+signUpTab.addEventListener("click", () => {
+  setAuthMode("sign-up");
+});
+
+logInForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setAuthStatus("");
+
+  try {
+    await authenticateAndJoin("/api/auth/sign-in", logInUsernameInput.value, logInPasswordInput.value);
+  } catch (error) {
+    setAuthStatus(error.message || "No such account.", true);
+  }
+});
+
+signUpForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  setAuthStatus("");
+
+  if (createAccountButton.disabled) {
+    return;
+  }
+
+  try {
+    await authenticateAndJoin("/api/auth/sign-up", signUpUsernameInput.value, signUpPasswordInput.value);
+  } catch (error) {
+    if ((error.message || "").toLowerCase() === "used") {
+      signUpUsernameAvailable = false;
+      setUsernameStatus("Used", "error");
+      syncCreateAccountState();
+      return;
+    }
+
+    setAuthStatus(error.message || "Unable to create account.", true);
+  }
+});
+
+signUpUsernameInput.addEventListener("input", () => {
+  setAuthStatus("");
+  checkUsernameAvailability(signUpUsernameInput.value);
+});
+
+signUpPasswordInput.addEventListener("input", () => {
+  syncCreateAccountState();
+});
+
+logInUsernameInput.addEventListener("input", () => {
+  setAuthStatus("");
 });
 
 messageForm.addEventListener("submit", async (event) => {
@@ -449,7 +643,10 @@ document.addEventListener("keydown", (event) => {
 });
 
 applyTheme(getPreferredTheme(), false);
+setAuthMode("log-in");
+toggleViews(false);
 syncOptionState();
+resetAuthForms();
 
 window.addEventListener("beforeunload", () => {
   if (!session) {

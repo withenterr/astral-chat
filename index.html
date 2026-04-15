@@ -65,23 +65,91 @@
         </p>
       </section>
 
-      <section id="join-view" class="panel">
-        <h2>Join The Room</h2>
-        <form id="join-form" class="stack">
+      <section id="auth-view" class="panel auth-panel">
+        <p class="eyebrow">Account Selection</p>
+        <h2>Log In Or Sign Up</h2>
+        <p class="lede auth-lede">
+          Create an account with a unique username and password, or log in with an existing one
+          before you enter the chat.
+        </p>
+
+        <div class="auth-switcher" role="tablist" aria-label="Account options">
+          <button
+            id="log-in-tab"
+            class="secondary-button auth-tab auth-tab--active"
+            type="button"
+            aria-selected="true"
+          >
+            Log In
+          </button>
+          <button
+            id="sign-up-tab"
+            class="secondary-button auth-tab"
+            type="button"
+            aria-selected="false"
+          >
+            Sign Up
+          </button>
+        </div>
+
+        <form id="log-in-form" class="stack auth-form">
           <label class="field">
-            <span>Display name</span>
+            <span>Username</span>
             <input
-              id="name-input"
-              name="name"
+              id="log-in-username"
+              name="username"
               type="text"
               maxlength="24"
-              placeholder="Your name"
-              autocomplete="nickname"
+              placeholder="Your username"
+              autocomplete="username"
               required
             />
           </label>
-          <button class="primary-button" type="submit">Enter Chat</button>
+          <label class="field">
+            <span>Password</span>
+            <input
+              id="log-in-password"
+              name="password"
+              type="password"
+              placeholder="Your password"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+          <button class="primary-button" type="submit">Log In</button>
         </form>
+
+        <form id="sign-up-form" class="stack auth-form is-hidden">
+          <label class="field">
+            <span>Username</span>
+            <input
+              id="sign-up-username"
+              name="username"
+              type="text"
+              maxlength="24"
+              placeholder="Choose a username"
+              autocomplete="username"
+              required
+            />
+          </label>
+          <p id="sign-up-username-status" class="field-status is-hidden" aria-live="polite"></p>
+          <label class="field">
+            <span>Password</span>
+            <input
+              id="sign-up-password"
+              name="password"
+              type="password"
+              placeholder="Create a password"
+              autocomplete="new-password"
+              required
+            />
+          </label>
+          <button id="create-account-button" class="primary-button" type="submit" disabled>
+            Create Account
+          </button>
+        </form>
+
+        <p id="auth-status" class="field-status is-hidden" aria-live="polite"></p>
       </section>
 
       <section id="chat-view" class="chat-layout is-hidden">

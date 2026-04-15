@@ -179,6 +179,12 @@ body.menu-open .options-menu {
   cursor: default;
 }
 
+.primary-button:disabled,
+.secondary-button:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
 .app-shell {
   width: min(1120px, calc(100% - 32px));
   margin: 0 auto;
@@ -242,10 +248,53 @@ h2 {
   margin-top: 16px;
 }
 
+.auth-panel {
+  max-width: 560px;
+}
+
+.auth-lede {
+  max-width: none;
+}
+
+.auth-switcher {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.auth-tab {
+  text-align: center;
+}
+
+.auth-tab--active {
+  background: var(--primary-button-background);
+  color: var(--primary-button-text);
+}
+
+.auth-form {
+  margin-top: 20px;
+}
+
 .field {
   display: grid;
   gap: 8px;
   color: var(--muted-text);
+}
+
+.field-status {
+  margin: -4px 0 0;
+  min-height: 1.25rem;
+  font-size: 0.92rem;
+  color: var(--muted-text);
+}
+
+.field-status.is-error {
+  color: var(--admin-accent);
+}
+
+.field-status.is-success {
+  color: var(--primary-button-background);
 }
 
 input {

@@ -1,13 +1,22 @@
-import { createReadStream, existsSync, statSync } from "node:fs";
+import {
+  createReadStream,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import http from "node:http";
 import { extname, join, normalize } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 
+import { createAccountStore } from "./src/accountStore.js";
 import { createChatStore } from "./src/chatStore.js";
 
 const HOST = process.env.HOST || "0.0.0.0";
 const PORT = Number(process.env.PORT || 3000);
 const ROOT = process.cwd();
+const ACCOUNT_DATA_PATH = join(ROOT, "data", "accounts.json");
 const PRESENCE_MAX_IDLE_MS = 30_000;
 const PRESENCE_SWEEP_MS = 10_000;
 const ADMIN_REDEEM_CODE_HASH =
@@ -20,11 +29,40 @@ const MIME_TYPES = {
   ".json": "application/json; charset=utf-8",
 };
 
+function loadPersistedAccounts() {
+  if (!existsSync(ACCOUNT_DATA_PATH)) {
+    return [];
+  }
+
+  try {
+    const raw = readFileSync(ACCOUNT_DATA_PATH, "utf8");
+    const payload = JSON.parse(raw);
+    return Array.isArray(payload.accounts) ? payload.accounts : [];
+  } catch (error) {
+    console.error("Failed to load accounts:", error.message);
+    return [];
+  }
+}
+
+const accountStore = createAccountStore({
+  accounts: loadPersistedAccounts(),
+  idGenerator: () => randomUUID(),
+});
+
 const store = createChatStore({
   idGenerator: () => randomUUID(),
   clock: () => Date.now(),
 });
 const streams = new Map();
+
+function persistAccounts() {
+  mkdirSync(join(ROOT, "data"), { recursive: true });
+  writeFileSync(
+    ACCOUNT_DATA_PATH,
+    `${JSON.stringify({ accounts: accountStore.serializeAccounts() }, null, 2)}\n`,
+    "utf8",
+  );
+}
 
 function hashValue(value) {
   return createHash("sha256").update(String(value || "")).digest("hex");
@@ -154,6 +192,40 @@ const server = http.createServer(async (request, response) => {
   const pathname = getPathname(url);
 
   if (request.method === "GET" && pathname === "/api/health") {
+    sendJson(response, 200, { ok: true });
+    return;
+  }
+
+  if (request.method === "GET" && pathname === "/api/auth/availability") {
+    const username = url.searchParams.get("username") || "";
+    sendJson(response, 200, accountStore.getAvailability(username));
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/auth/sign-up") {
+    try {
+      const { username, password } = await readBody(request);
+      const account = accountStore.signUp(username, password);
+      persistAccounts();
+      sendJson(response, 200, { ok: true, account });
+    } catch (error) {
+      sendJson(response, 400, { error: error.message || "Unable to create account." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/auth/sign-in") {
+    try {
+      const { username, password } = await readBody(request);
+      const account = accountStore.signIn(username, password);
+      sendJson(response, 200, { ok: true, account });
+    } catch (error) {
+      sendJson(response, 400, { error: error.message || "No such account." });
+    }
+    return;
+  }
+
+  if (request.method === "POST" && pathname === "/api/auth/sign-out") {
     sendJson(response, 200, { ok: true });
     return;
   }
