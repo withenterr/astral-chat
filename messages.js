@@ -28,3 +28,24 @@ export async function getMessages() {
 
   return data;
 }
+
+export function subscribeToMessages(onInsert) {
+  return supabase
+    .channel("messages")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+      },
+      (payload) => {
+        console.log("New realtime message:", payload.new);
+
+        if (typeof onInsert === "function") {
+          onInsert(payload.new, payload);
+        }
+      },
+    )
+    .subscribe();
+}
