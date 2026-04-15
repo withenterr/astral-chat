@@ -3,6 +3,7 @@ import { supabase } from "./supabaseClient.js";
 // Convert username to internal email format for Supabase
 function usernameToEmail(username) {
   const cleanUsername = username.toLowerCase().replace(/[^a-z0-9_]/g, '');
+  console.log('Converting username to email:', username, '->', `${cleanUsername}@astral-chat.internal`);
   return `${cleanUsername}@astral-chat.internal`;
 }
 
@@ -17,6 +18,8 @@ function emailToUsername(email) {
 export async function signUp(username, password) {
   const email = usernameToEmail(username);
   
+  console.log('Attempting sign up with:', { username, email, passwordLength: password.length });
+  
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -28,10 +31,18 @@ export async function signUp(username, password) {
     }
   });
 
+  console.log('Sign up response:', { data, error });
+
   if (error) {
-    console.error('Signup error:', error);
+    console.error('Signup error details:', {
+      message: error.message,
+      status: error.status,
+      code: error.code
+    });
     throw new Error(error.message || 'Signup failed');
   }
+
+  console.log('Sign up successful, user:', data.user);
 
   // Store the original username for session management
   if (data.user) {
@@ -44,15 +55,25 @@ export async function signUp(username, password) {
 export async function signIn(username, password) {
   const email = usernameToEmail(username);
   
+  console.log('Attempting sign in with:', { username, email, passwordLength: password.length });
+  
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
+  console.log('Sign in response:', { data, error });
+
   if (error) {
-    console.error('Signin error:', error);
+    console.error('Signin error details:', {
+      message: error.message,
+      status: error.status,
+      code: error.code
+    });
     throw new Error(error.message || 'Login failed');
   }
+
+  console.log('Sign in successful, user:', data.user);
 
   // Store the original username for session management
   if (data.user) {
