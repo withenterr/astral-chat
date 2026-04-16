@@ -1,22 +1,27 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Chat Platform API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: servers
+    description: Chat server operations
+  - name: messages
+    description: Message operations
+  - name: presence
+    description: Online presence operations
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +29,471 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /servers:
+    get:
+      operationId: listServers
+      tags: [servers]
+      summary: List all servers
+      responses:
+        "200":
+          description: List of servers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Server"
+    post:
+      operationId: createServer
+      tags: [servers]
+      summary: Create a new server
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateServerBody"
+      responses:
+        "201":
+          description: Server created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+
+  /servers/{serverId}:
+    get:
+      operationId: getServer
+      tags: [servers]
+      summary: Get a server by ID
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Server details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "404":
+          description: Server not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    put:
+      operationId: updateServer
+      tags: [servers]
+      summary: Update server (owner only)
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateServerBody"
+      responses:
+        "200":
+          description: Server updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteServer
+      tags: [servers]
+      summary: Delete server (owner only)
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerActionBody"
+      responses:
+        "204":
+          description: Server deleted
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /servers/{serverId}/join:
+    post:
+      operationId: joinServer
+      tags: [servers]
+      summary: Join a server using invite code or server ID
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinServerBody"
+      responses:
+        "200":
+          description: Joined successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "404":
+          description: Server not found or invalid invite
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /servers/{serverId}/invite:
+    post:
+      operationId: generateInviteCode
+      tags: [servers]
+      summary: Generate a new invite code (owner only)
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerActionBody"
+      responses:
+        "200":
+          description: Invite code generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InviteCodeResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /servers/{serverId}/transfer:
+    post:
+      operationId: generateTransferCode
+      tags: [servers]
+      summary: Generate an ownership transfer code (owner only)
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OwnerActionBody"
+      responses:
+        "200":
+          description: Transfer code generated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransferCodeResponse"
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /servers/{serverId}/redeem-transfer:
+    post:
+      operationId: redeemTransferCode
+      tags: [servers]
+      summary: Redeem an ownership transfer code
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RedeemTransferBody"
+      responses:
+        "200":
+          description: Ownership transferred
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "400":
+          description: Invalid or expired transfer code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /servers/{serverId}/join-by-code:
+    post:
+      operationId: joinByInviteCode
+      tags: [servers]
+      summary: Join a server using invite code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/JoinByCodeBody"
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Joined successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "404":
+          description: Invalid invite code
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /servers/find-by-code:
+    post:
+      operationId: findServerByCode
+      tags: [servers]
+      summary: Find a server by invite code
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FindByCodeBody"
+      responses:
+        "200":
+          description: Server found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Server"
+        "404":
+          description: Server not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /servers/{serverId}/messages:
+    get:
+      operationId: listMessages
+      tags: [messages]
+      summary: List messages for a server
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: before
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Message"
+    post:
+      operationId: createMessage
+      tags: [messages]
+      summary: Send a message
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMessageBody"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Message"
+
+  /servers/{serverId}/messages/{messageId}:
+    delete:
+      operationId: deleteMessage
+      tags: [messages]
+      summary: Delete a message (owner or message author)
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteMessageBody"
+      responses:
+        "204":
+          description: Message deleted
+        "403":
+          description: Forbidden
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /servers/{serverId}/presence:
+    post:
+      operationId: updatePresence
+      tags: [presence]
+      summary: Update user presence (heartbeat)
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PresenceBody"
+      responses:
+        "200":
+          description: Presence updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PresenceResponse"
+    get:
+      operationId: getOnlineUsers
+      tags: [presence]
+      summary: Get online users for a server
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of online users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OnlineUser"
+
+  /servers/{serverId}/typing:
+    post:
+      operationId: sendTypingIndicator
+      tags: [presence]
+      summary: Send typing indicator
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TypingBody"
+      responses:
+        "200":
+          description: Typing indicator sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TypingResponse"
+    get:
+      operationId: getTypingUsers
+      tags: [presence]
+      summary: Get currently typing users
+      parameters:
+        - name: serverId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of typing users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/TypingUser"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +504,259 @@ components:
       required:
         - status
 
+    Server:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        ownerId:
+          type: string
+        inviteCode:
+          type: string
+        memberCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - ownerId
+        - inviteCode
+        - memberCount
+        - createdAt
+
+    CreateServerBody:
+      type: object
+      properties:
+        name:
+          type: string
+        ownerId:
+          type: string
+        ownerName:
+          type: string
+        ownerColor:
+          type: string
+      required:
+        - name
+        - ownerId
+        - ownerName
+
+    UpdateServerBody:
+      type: object
+      properties:
+        name:
+          type: string
+        requesterId:
+          type: string
+      required:
+        - name
+        - requesterId
+
+    OwnerActionBody:
+      type: object
+      properties:
+        requesterId:
+          type: string
+      required:
+        - requesterId
+
+    JoinServerBody:
+      type: object
+      properties:
+        userId:
+          type: string
+        userName:
+          type: string
+        userColor:
+          type: string
+        inviteCode:
+          type: string
+      required:
+        - userId
+        - userName
+
+    JoinByCodeBody:
+      type: object
+      properties:
+        userId:
+          type: string
+        userName:
+          type: string
+        userColor:
+          type: string
+        inviteCode:
+          type: string
+      required:
+        - userId
+        - userName
+        - inviteCode
+
+    FindByCodeBody:
+      type: object
+      properties:
+        inviteCode:
+          type: string
+      required:
+        - inviteCode
+
+    InviteCodeResponse:
+      type: object
+      properties:
+        inviteCode:
+          type: string
+      required:
+        - inviteCode
+
+    TransferCodeResponse:
+      type: object
+      properties:
+        transferCode:
+          type: string
+      required:
+        - transferCode
+
+    RedeemTransferBody:
+      type: object
+      properties:
+        userId:
+          type: string
+        userName:
+          type: string
+        transferCode:
+          type: string
+      required:
+        - userId
+        - userName
+        - transferCode
+
+    Message:
+      type: object
+      properties:
+        id:
+          type: string
+        serverId:
+          type: string
+        userId:
+          type: string
+        userName:
+          type: string
+        userColor:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - serverId
+        - userId
+        - userName
+        - content
+        - createdAt
+
+    CreateMessageBody:
+      type: object
+      properties:
+        userId:
+          type: string
+        userName:
+          type: string
+        userColor:
+          type: string
+        content:
+          type: string
+      required:
+        - userId
+        - userName
+        - content
+
+    DeleteMessageBody:
+      type: object
+      properties:
+        requesterId:
+          type: string
+      required:
+        - requesterId
+
+    PresenceBody:
+      type: object
+      properties:
+        userId:
+          type: string
+        userName:
+          type: string
+        userColor:
+          type: string
+      required:
+        - userId
+        - userName
+
+    PresenceResponse:
+      type: object
+      properties:
+        onlineCount:
+          type: integer
+      required:
+        - onlineCount
+
+    OnlineUser:
+      type: object
+      properties:
+        userId:
+          type: string
+        userName:
+          type: string
+        userColor:
+          type: string
+        lastSeen:
+          type: string
+          format: date-time
+      required:
+        - userId
+        - userName
+        - lastSeen
+
+    TypingBody:
+      type: object
+      properties:
+        userId:
+          type: string
+        userName:
+          type: string
+        isTyping:
+          type: boolean
+      required:
+        - userId
+        - userName
+        - isTyping
+
+    TypingResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success
+
+    TypingUser:
+      type: object
+      properties:
+        userId:
+          type: string
+        userName:
+          type: string
+      required:
+        - userId
+        - userName
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
