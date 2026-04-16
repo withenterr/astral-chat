@@ -1,5 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
-import { QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
+import {
+  QueryClient,
+  QueryClientProvider,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   useListServers,
   useCreateServer,
@@ -70,6 +74,7 @@ function ChatApp() {
 
   const { data: servers = [] } = useListServers({
     query: {
+      queryKey: ["servers"],
       enabled: !!identity,
       refetchInterval: 10000,
     },
@@ -79,10 +84,11 @@ function ChatApp() {
     identity?.userId ?? "",
     {
       query: {
+        queryKey: ["servers"],
         enabled: !!identity,
         refetchInterval: 5000,
       },
-    }
+    },
   );
 
   const createServer = useCreateServer();
@@ -106,67 +112,73 @@ function ChatApp() {
     setAdminState(isAdmin());
   }, []);
 
-  const handleCreateServer = useCallback(async (name: string) => {
-    if (!identity || !isAdmin()) return;
-    const newServer = await createServer.mutateAsync({
-      data: {
-        name,
-        ownerId: identity.userId,
-        ownerName: identity.userName,
-        ownerColor: identity.userColor,
-      },
-    });
-    addJoinedServer(newServer.id);
-    setJoinedServerIds(getJoinedServers());
-    setActiveServerId(newServer.id);
-    setActiveDm(null);
-    qc.invalidateQueries({ queryKey: getListServersQueryKey() });
-  }, [identity, createServer, qc]);
+  const handleCreateServer = useCallback(
+    async (name: string) => {
+      if (!identity || !isAdmin()) return;
+      const newServer = await createServer.mutateAsync({
+        data: {
+          name,
+          ownerId: identity.userId,
+          ownerName: identity.userName,
+          ownerColor: identity.userColor,
+        },
+      });
+      addJoinedServer(newServer.id);
+      setJoinedServerIds(getJoinedServers());
+      setActiveServerId(newServer.id);
+      setActiveDm(null);
+      qc.invalidateQueries({ queryKey: getListServersQueryKey() });
+    },
+    [identity, createServer, qc],
+  );
 
-  const handleJoinServer = useCallback(async (codeOrId: string) => {
-    if (!identity) return;
+  const handleJoinServer = useCallback(
+    async (codeOrId: string) => {
+      if (!identity) return;
 
-    let foundServer: Server | null = null;
+      let foundServer: Server | null = null;
 
-    if (codeOrId.length <= 12 && /^[A-Z0-9]+$/i.test(codeOrId)) {
-      try {
-        foundServer = await findByCode.mutateAsync({
-          data: { inviteCode: codeOrId.toUpperCase() },
-        });
-      } catch {
-        foundServer = null;
+      if (codeOrId.length <= 12 && /^[A-Z0-9]+$/i.test(codeOrId)) {
+        try {
+          foundServer = await findByCode.mutateAsync({
+            data: { inviteCode: codeOrId.toUpperCase() },
+          });
+        } catch {
+          foundServer = null;
+        }
       }
-    }
 
-    if (!foundServer) {
-      const joinResult = await joinServer.mutateAsync({
-        serverId: codeOrId,
-        data: {
-          userId: identity.userId,
-          userName: identity.userName,
-          userColor: identity.userColor,
-        },
-      });
-      foundServer = joinResult;
-    } else {
-      const joinResult = await joinServer.mutateAsync({
-        serverId: foundServer.id,
-        data: {
-          userId: identity.userId,
-          userName: identity.userName,
-          userColor: identity.userColor,
-          inviteCode: codeOrId.toUpperCase(),
-        },
-      });
-      foundServer = joinResult;
-    }
+      if (!foundServer) {
+        const joinResult = await joinServer.mutateAsync({
+          serverId: codeOrId,
+          data: {
+            userId: identity.userId,
+            userName: identity.userName,
+            userColor: identity.userColor,
+          },
+        });
+        foundServer = joinResult;
+      } else {
+        const joinResult = await joinServer.mutateAsync({
+          serverId: foundServer.id,
+          data: {
+            userId: identity.userId,
+            userName: identity.userName,
+            userColor: identity.userColor,
+            inviteCode: codeOrId.toUpperCase(),
+          },
+        });
+        foundServer = joinResult;
+      }
 
-    addJoinedServer(foundServer.id);
-    setJoinedServerIds(getJoinedServers());
-    setActiveServerId(foundServer.id);
-    setActiveDm(null);
-    qc.invalidateQueries({ queryKey: getListServersQueryKey() });
-  }, [identity, findByCode, joinServer, qc]);
+      addJoinedServer(foundServer.id);
+      setJoinedServerIds(getJoinedServers());
+      setActiveServerId(foundServer.id);
+      setActiveDm(null);
+      qc.invalidateQueries({ queryKey: getListServersQueryKey() });
+    },
+    [identity, findByCode, joinServer, qc],
+  );
 
   const handleServerDeleted = useCallback(() => {
     setActiveServerId(null);
@@ -174,32 +186,44 @@ function ChatApp() {
     qc.invalidateQueries({ queryKey: getListServersQueryKey() });
   }, [qc]);
 
-  const handleUserNameChanged = useCallback((name: string) => {
-    if (!identity) return;
-    setIdentity({ ...identity, userName: name });
-  }, [identity]);
+  const handleUserNameChanged = useCallback(
+    (name: string) => {
+      if (!identity) return;
+      setIdentity({ ...identity, userName: name });
+    },
+    [identity],
+  );
 
   const handleSelectDm = useCallback(async (conv: DmConversation) => {
     setActiveDm(conv);
     setActiveServerId(null);
   }, []);
 
-  const handleOpenDmWith = useCallback(async (targetUserId: string, targetUserName: string, targetUserColor: string) => {
-    if (!identity) return;
-    const conv = await getOrCreateDm.mutateAsync({
-      data: {
-        userAId: identity.userId,
-        userAName: identity.userName,
-        userAColor: identity.userColor,
-        userBId: targetUserId,
-        userBName: targetUserName,
-        userBColor: targetUserColor,
-      },
-    });
-    setActiveDm(conv);
-    setActiveServerId(null);
-    qc.invalidateQueries({ queryKey: getListDmConversationsQueryKey(identity.userId) });
-  }, [identity, getOrCreateDm, qc]);
+  const handleOpenDmWith = useCallback(
+    async (
+      targetUserId: string,
+      targetUserName: string,
+      targetUserColor: string,
+    ) => {
+      if (!identity) return;
+      const conv = await getOrCreateDm.mutateAsync({
+        data: {
+          userAId: identity.userId,
+          userAName: identity.userName,
+          userAColor: identity.userColor,
+          userBId: targetUserId,
+          userBName: targetUserName,
+          userBColor: targetUserColor,
+        },
+      });
+      setActiveDm(conv);
+      setActiveServerId(null);
+      qc.invalidateQueries({
+        queryKey: getListDmConversationsQueryKey(identity.userId),
+      });
+    },
+    [identity, getOrCreateDm, qc],
+  );
 
   const handleLogout = useCallback(() => {
     window.location.reload();
@@ -242,11 +266,7 @@ function ChatApp() {
       />
 
       {activeDm ? (
-        <DmView
-          key={activeDm.id}
-          conversation={activeDm}
-          identity={identity}
-        />
+        <DmView key={activeDm.id} conversation={activeDm} identity={identity} />
       ) : activeServer ? (
         <ChatView
           key={activeServer.id}
@@ -259,8 +279,18 @@ function ChatApp() {
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center bg-background text-center px-8">
           <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-6">
-            <svg className="w-10 h-10 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+            <svg
+              className="w-10 h-10 text-muted-foreground"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
             </svg>
           </div>
           <h2 className="text-xl font-bold text-foreground mb-2">
