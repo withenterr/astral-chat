@@ -151,8 +151,9 @@ function isCurrentUserAdmin() {
 }
 
 function syncOptionState() {
-  menuLeaveButton.disabled = !session;
-  redeemToggle.disabled = !session;
+  // Remove session-based blocking - always enable UI controls
+  menuLeaveButton.disabled = false;
+  redeemToggle.disabled = false;
 }
 
 function toggleViews(isInChat) {
@@ -417,9 +418,7 @@ async function fetchJson(url) {
 }
 
 async function postTypingState(typing) {
-  if (!session) {
-    return;
-  }
+  // Remove session-based blocking - always allow typing state
 
   try {
     await postJson("/api/typing", {
@@ -436,9 +435,7 @@ function syncComposerState() {
   localTyping = hasText;
   renderTypingIndicator();
 
-  if (!session) {
-    return;
-  }
+  // Remove session-based blocking - always allow composer state
 
   if (typingResetTimer) {
     window.clearTimeout(typingResetTimer);
@@ -547,9 +544,7 @@ function openRealtimeChannel() {
   };
 
   pingTimer = window.setInterval(async () => {
-    if (!session) {
-      return;
-    }
+    // Remove session-based blocking - always allow pinging
 
     try {
       await postJson("/api/ping", { sessionId: session.id });
@@ -593,9 +588,7 @@ async function authenticateAndJoin(authFunction, username, password) {
 }
 
 async function leaveChat() {
-  if (!session) {
-    return;
-  }
+  // Remove session-based blocking - always allow leaving chat
 
   const sessionId = session.id;
   const shouldClearTyping = typingSent;
@@ -862,9 +855,7 @@ voiceButton.addEventListener("pointercancel", stopVoiceHold);
 messageForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  if (!session) {
-    return;
-  }
+  // Remove session-based blocking - always allow message submission
 
   try {
     await postJson("/api/messages", {
@@ -903,9 +894,7 @@ redeemToggle.addEventListener("click", () => {
 redeemForm.addEventListener("submit", async (event) => {
   event.preventDefault();
 
-  if (!session) {
-    return;
-  }
+  // Remove session-based blocking - always allow redemption
 
   try {
     const payload = await postJson("/api/redeem", {
@@ -937,9 +926,11 @@ menuLeaveButton.addEventListener("click", () => {
 function handleParticipantAction(event) {
   const button = event.target.closest("[data-action]");
 
-  if (!button || !session) {
+  if (!button) {
     return;
   }
+
+  // Remove session-based blocking - always allow participant actions
 
   const targetSessionId = button.dataset.participantId;
   const action = button.dataset.action;
@@ -971,9 +962,8 @@ peopleParticipantList.addEventListener("click", handleParticipantAction);
 chatView.addEventListener(
   "touchstart",
   (event) => {
-    if (!session || event.touches.length !== 1) {
-      return;
-    }
+   
+
 
     swipeTracking = true;
     swipeStartX = event.touches[0].clientX;
@@ -1170,9 +1160,7 @@ confirmUpgradeButton.addEventListener('click', async (event) => {
 });
 
 window.addEventListener("beforeunload", () => {
-  if (!session) {
-    return;
-  }
+  // Remove session-based blocking - always handle beforeunload
 
   navigator.sendBeacon(
     "/api/leave",
