@@ -1090,14 +1090,42 @@ async function initializeAuth() {
 
 applyTheme(getPreferredTheme(), false);
 
-// Initialize app with hybrid authentication
+// Initialize app with simple guest authentication
 // The app will auto-login as guest and open directly to chat
 
-// Initialize auth on page load
-initializeAuth();
+// Simple guest initialization - no Supabase dependencies
+async function initializeGuestApp() {
+  try {
+    console.log("Initializing guest app...");
+    
+    // Create guest user immediately
+    const guestUser = await autoLoginAsGuest();
+    
+    if (guestUser?.user) {
+      const username = guestUser.user.username || 'Guest';
+      console.log("Guest account created:", username);
+      await joinChat(username);
+      updateGuestInfo(guestUser);
+    } else {
+      console.error("Failed to create guest account");
+      // Fallback to ensure app doesn't get stuck
+      const fallbackUser = { user: { username: 'Guest_User', isGuest: true } };
+      updateGuestInfo(fallbackUser);
+      joinChat('Guest_User');
+    }
+  } catch (error) {
+    console.error("Guest initialization error:", error);
+    // Ensure app continues even on error
+    const fallbackUser = { user: { username: 'Guest_Fallback', isGuest: true } };
+    updateGuestInfo(fallbackUser);
+    joinChat('Guest_Fallback');
+  }
+}
+
+// Initialize app on page load
+initializeGuestApp();
 
 syncOptionState();
-resetAuthForms();
 syncComposerState();
 
 // Add new hybrid authentication system event listeners
