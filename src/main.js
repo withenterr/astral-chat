@@ -1064,63 +1064,38 @@ document.addEventListener("keydown", (event) => {
 async function initializeAuth() {
   try {
     console.log("Initializing hybrid auth...");
-    const currentUser = await getCurrentUser();
     
-    if (currentUser?.user) {
-      // User has valid session (guest or permanent)
-      const username = currentUser.user.username || 'User';
-      console.log("Found existing session for user:", username, currentUser.user.isGuest ? "(Guest)" : "(Permanent)");
+    // Always auto-login as guest immediately - no waiting for existing sessions
+    console.log("Creating guest account immediately...");
+    const guestUser = await autoLoginAsGuest();
+    
+    if (guestUser?.user) {
+      const username = guestUser.user.username || 'Guest';
+      console.log("Guest account created:", username);
       await joinChat(username);
-      updateGuestInfo(currentUser);
+      updateGuestInfo(guestUser);
     } else {
-      // No valid session - auto-login as guest
-      console.log("No existing session, creating guest account...");
-      const guestUser = await autoLoginAsGuest();
-      if (guestUser?.user) {
-        await joinChat(guestUser.user.username);
-        updateGuestInfo(guestUser);
-      }
+      console.error("Failed to create guest account");
     }
   } catch (error) {
     console.error("Auth initialization error:", error);
+    // Even if auth fails, continue with app to avoid stuck loading
+    setTimeout(() => {
+      const fallbackUser = { user: { username: 'Guest_User', isGuest: true } };
+      updateGuestInfo(fallbackUser);
+      joinChat('Guest_User');
+    }, 1000);
   }
 }
 
 applyTheme(getPreferredTheme(), false);
-setAuthMode("log-in");
-toggleViews(false);
-setActivePane("chat");
-syncOptionState();
-resetAuthForms();
-syncComposerState();
+
+// Initialize app with hybrid authentication
+// The app will auto-login as guest and open directly to chat
 
 // Initialize auth on page load
 initializeAuth();
 
-// Update app initialization to open directly to chat instead of auth screen
-// Since we use hybrid auth, we want to start in chat view immediately
-// The initializeAuth function will handle auto-login as guest and join chat
-// No need to show auth screen first
-
-// Remove auth screen initialization - we want to start directly in chat
-// The app should open directly to chat view for hybrid authentication
-// This removes the need to show auth screen first
-
-// Update app initialization to open directly to chat immediately
-// Since we use hybrid auth, we want to start in chat view immediately
-// The initializeAuth function will handle auto-login as guest and join chat
-// No need to show auth screen first
-
-// Remove auth screen initialization calls
-// Since we use hybrid auth, we want to start in chat view immediately
-// The initializeAuth function will handle auto-login as guest and join chat
-// No need to show auth screen first
-
-// Update app initialization to start directly in chat
-// Remove the following lines that show auth screen first:
-setAuthMode("log-in");
-toggleViews(false);
-setActivePane("chat");
 syncOptionState();
 resetAuthForms();
 syncComposerState();
