@@ -102,7 +102,6 @@ function ChatApp() {
     setIdentity({ userId: id, userName: name, userColor: color });
     setShowNameModal(false);
   }, []);
-
   const handleThemeChange = useCallback((t: Theme) => {
     persistTheme(t);
     setThemeState(t);
@@ -114,7 +113,11 @@ function ChatApp() {
 
   const handleCreateServer = useCallback(
     async (name: string) => {
-      if (!identity || !isAdmin()) return;
+      if (!identity) return;
+
+      if (!isAdmin()) {
+        throw new Error("Only admins can create group chats");
+      }
       const newServer = await createServer.mutateAsync({
         data: {
           name,
