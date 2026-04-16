@@ -123,7 +123,49 @@ export interface ErrorResponse {
   error: string;
 }
 
+export interface DmConversation {
+  id: string;
+  userAId: string;
+  userAName: string;
+  userAColor?: string;
+  userBId: string;
+  userBName: string;
+  userBColor?: string;
+  lastMessageAt: string;
+  createdAt: string;
+}
+
+export interface DmMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  senderColor?: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface GetOrCreateDmBody {
+  userAId: string;
+  userAName: string;
+  userAColor?: string;
+  userBId: string;
+  userBName: string;
+  userBColor?: string;
+}
+
+export interface SendDmBody {
+  senderId: string;
+  senderName: string;
+  senderColor?: string;
+  content: string;
+}
+
 export type ListMessagesParams = {
   limit?: number;
   before?: string;
+};
+
+export type ListDmMessagesParams = {
+  limit?: number;
 };

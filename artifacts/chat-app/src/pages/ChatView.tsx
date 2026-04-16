@@ -25,9 +25,10 @@ interface ChatViewProps {
   identity: UserIdentity;
   onServerDeleted: () => void;
   onUserNameChanged: (name: string) => void;
+  onOpenDmWith?: (userId: string, userName: string, userColor: string) => void;
 }
 
-export function ChatView({ server, identity, onServerDeleted, onUserNameChanged }: ChatViewProps) {
+export function ChatView({ server, identity, onServerDeleted, onUserNameChanged, onOpenDmWith }: ChatViewProps) {
   const { userId, userName, userColor } = identity;
   const queryClient = useQueryClient();
   const [showSettings, setShowSettings] = useState(false);
@@ -156,6 +157,7 @@ export function ChatView({ server, identity, onServerDeleted, onUserNameChanged 
           users={onlineUsers}
           serverOwnerId={currentServer.ownerId}
           currentUserId={userId}
+          onOpenDm={onOpenDmWith}
         />
       </div>
 

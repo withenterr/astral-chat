@@ -5,14 +5,19 @@ import {
   useCreateServer,
   useJoinServer,
   useFindServerByCode,
+  useListDmConversations,
+  useGetOrCreateDm,
   getListServersQueryKey,
+  getListDmConversationsQueryKey,
 } from "@workspace/api-client-react";
-import type { Server } from "@workspace/api-client-react";
+import type { Server, DmConversation } from "@workspace/api-client-react";
 import { NameModal } from "@/components/NameModal";
 import { ServerSidebar } from "@/components/ServerSidebar";
 import { CreateServerModal } from "@/components/CreateServerModal";
 import { JoinServerModal } from "@/components/JoinServerModal";
+import { HamburgerMenu } from "@/components/HamburgerMenu";
 import { ChatView } from "@/pages/ChatView";
+import { DmView } from "@/pages/DmView";
 import {
   getUserName,
   getOrCreateUserId,
@@ -20,8 +25,12 @@ import {
   getJoinedServers,
   addJoinedServer,
   ensureIdentity,
+  isAdmin,
+  getTheme,
+  setTheme as persistTheme,
+  applyTheme,
 } from "@/lib/identity";
-import type { UserIdentity } from "@/lib/identity";
+import type { UserIdentity, Theme } from "@/lib/identity";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,14 +42,20 @@ function ChatApp() {
   const [identity, setIdentity] = useState<UserIdentity | null>(null);
   const [showNameModal, setShowNameModal] = useState(false);
   const [activeServerId, setActiveServerId] = useState<string | null>(null);
+  const [activeDm, setActiveDm] = useState<DmConversation | null>(null);
   const [joinedServerIds, setJoinedServerIds] = useState<string[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);
-  const [noServersHint, setNoServersHint] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+  const [adminState, setAdminState] = useState(isAdmin());
+  const [theme, setThemeState] = useState<Theme>(getTheme());
 
-  const queryClient = useQueryClient();
+  const qc = useQueryClient();
 
   useEffect(() => {
+    const t = getTheme();
+    applyTheme(t);
+    setThemeState(t);
     const userId = getOrCreateUserId();
     const userName = getUserName();
     if (!userName) {
@@ -50,6 +65,7 @@ function ChatApp() {
       setIdentity({ userId, userName, userColor: color });
     }
     setJoinedServerIds(getJoinedServers());
+    setAdminState(isAdmin());
   }, []);
 
   const { data: servers = [] } = useListServers({
@@ -59,9 +75,20 @@ function ChatApp() {
     },
   });
 
+  const { data: dmConversations = [] } = useListDmConversations(
+    identity?.userId ?? "",
+    {
+      query: {
+        enabled: !!identity,
+        refetchInterval: 5000,
+      },
+    }
+  );
+
   const createServer = useCreateServer();
   const joinServer = useJoinServer();
   const findByCode = useFindServerByCode();
+  const getOrCreateDm = useGetOrCreateDm();
 
   const handleNameComplete = useCallback((name: string) => {
     const id = getOrCreateUserId();
@@ -70,8 +97,17 @@ function ChatApp() {
     setShowNameModal(false);
   }, []);
 
+  const handleThemeChange = useCallback((t: Theme) => {
+    persistTheme(t);
+    setThemeState(t);
+  }, []);
+
+  const handleAdminChanged = useCallback(() => {
+    setAdminState(isAdmin());
+  }, []);
+
   const handleCreateServer = useCallback(async (name: string) => {
-    if (!identity) return;
+    if (!identity || !isAdmin()) return;
     const newServer = await createServer.mutateAsync({
       data: {
         name,
@@ -83,8 +119,9 @@ function ChatApp() {
     addJoinedServer(newServer.id);
     setJoinedServerIds(getJoinedServers());
     setActiveServerId(newServer.id);
-    queryClient.invalidateQueries({ queryKey: getListServersQueryKey() });
-  }, [identity, createServer, queryClient]);
+    setActiveDm(null);
+    qc.invalidateQueries({ queryKey: getListServersQueryKey() });
+  }, [identity, createServer, qc]);
 
   const handleJoinServer = useCallback(async (codeOrId: string) => {
     if (!identity) return;
@@ -127,19 +164,51 @@ function ChatApp() {
     addJoinedServer(foundServer.id);
     setJoinedServerIds(getJoinedServers());
     setActiveServerId(foundServer.id);
-    queryClient.invalidateQueries({ queryKey: getListServersQueryKey() });
-  }, [identity, findByCode, joinServer, queryClient]);
+    setActiveDm(null);
+    qc.invalidateQueries({ queryKey: getListServersQueryKey() });
+  }, [identity, findByCode, joinServer, qc]);
 
   const handleServerDeleted = useCallback(() => {
     setActiveServerId(null);
     setJoinedServerIds(getJoinedServers());
-    queryClient.invalidateQueries({ queryKey: getListServersQueryKey() });
-  }, [queryClient]);
+    qc.invalidateQueries({ queryKey: getListServersQueryKey() });
+  }, [qc]);
 
   const handleUserNameChanged = useCallback((name: string) => {
     if (!identity) return;
     setIdentity({ ...identity, userName: name });
   }, [identity]);
+
+  const handleSelectDm = useCallback(async (conv: DmConversation) => {
+    setActiveDm(conv);
+    setActiveServerId(null);
+  }, []);
+
+  const handleOpenDmWith = useCallback(async (targetUserId: string, targetUserName: string, targetUserColor: string) => {
+    if (!identity) return;
+    const conv = await getOrCreateDm.mutateAsync({
+      data: {
+        userAId: identity.userId,
+        userAName: identity.userName,
+        userAColor: identity.userColor,
+        userBId: targetUserId,
+        userBName: targetUserName,
+        userBColor: targetUserColor,
+      },
+    });
+    setActiveDm(conv);
+    setActiveServerId(null);
+    qc.invalidateQueries({ queryKey: getListDmConversationsQueryKey(identity.userId) });
+  }, [identity, getOrCreateDm, qc]);
+
+  const handleLogout = useCallback(() => {
+    window.location.reload();
+  }, []);
+
+  const handleSelectServer = useCallback((id: string) => {
+    setActiveServerId(id);
+    setActiveDm(null);
+  }, []);
 
   const activeServer = servers.find((s) => s.id === activeServerId) ?? null;
 
@@ -161,18 +230,31 @@ function ChatApp() {
         servers={servers}
         joinedServerIds={joinedServerIds}
         activeServerId={activeServerId}
-        onSelectServer={setActiveServerId}
+        activeDmId={activeDm?.id ?? null}
+        dmConversations={dmConversations}
+        currentUserId={identity.userId}
+        onSelectServer={handleSelectServer}
+        onSelectDm={handleSelectDm}
         onCreateServer={() => setShowCreate(true)}
         onJoinServer={() => setShowJoin(true)}
+        onOpenMenu={() => setShowMenu(true)}
+        isAdmin={adminState}
       />
 
-      {activeServer ? (
+      {activeDm ? (
+        <DmView
+          key={activeDm.id}
+          conversation={activeDm}
+          identity={identity}
+        />
+      ) : activeServer ? (
         <ChatView
           key={activeServer.id}
           server={activeServer}
           identity={identity}
           onServerDeleted={handleServerDeleted}
           onUserNameChanged={handleUserNameChanged}
+          onOpenDmWith={handleOpenDmWith}
         />
       ) : (
         <div className="flex-1 flex flex-col items-center justify-center bg-background text-center px-8">
@@ -182,31 +264,43 @@ function ChatApp() {
             </svg>
           </div>
           <h2 className="text-xl font-bold text-foreground mb-2">
-            {joinedServerIds.length === 0 ? "No servers yet" : "Select a server"}
+            {joinedServerIds.length === 0 ? "Welcome!" : "Select a chat"}
           </h2>
           <p className="text-muted-foreground text-sm mb-6 max-w-xs">
             {joinedServerIds.length === 0
-              ? "Create a new server or join one with an invite code to start chatting."
-              : "Pick a server from the left sidebar to start chatting."}
+              ? adminState
+                ? "Create a server or join one with an invite code."
+                : "Join a server with an invite code to start chatting."
+              : "Pick a server or DM from the left sidebar."}
           </p>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowCreate(true)}
-              className="px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
-            >
-              Create Server
-            </button>
+          <div className="flex gap-3 flex-wrap justify-center">
+            {adminState && (
+              <button
+                onClick={() => setShowCreate(true)}
+                className="px-5 py-2.5 rounded-lg bg-primary text-primary-foreground font-semibold hover:opacity-90 transition-opacity"
+              >
+                Create Server
+              </button>
+            )}
             <button
               onClick={() => setShowJoin(true)}
               className="px-5 py-2.5 rounded-lg border border-border text-foreground hover:bg-secondary transition-colors font-medium"
             >
               Join Server
             </button>
+            {!adminState && (
+              <button
+                onClick={() => setShowMenu(true)}
+                className="px-5 py-2.5 rounded-lg border border-primary text-primary hover:bg-primary hover:text-primary-foreground transition-colors font-medium"
+              >
+                Redeem Admin Code
+              </button>
+            )}
           </div>
         </div>
       )}
 
-      {showCreate && (
+      {showCreate && adminState && (
         <CreateServerModal
           onClose={() => setShowCreate(false)}
           onCreate={handleCreateServer}
@@ -217,6 +311,19 @@ function ChatApp() {
         <JoinServerModal
           onClose={() => setShowJoin(false)}
           onJoin={handleJoinServer}
+        />
+      )}
+
+      {showMenu && (
+        <HamburgerMenu
+          open={showMenu}
+          onClose={() => setShowMenu(false)}
+          userName={identity.userName}
+          theme={theme}
+          onThemeChange={handleThemeChange}
+          onNameChanged={handleUserNameChanged}
+          onLogout={handleLogout}
+          onAdminChanged={handleAdminChanged}
         />
       )}
     </div>

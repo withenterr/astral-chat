@@ -147,6 +147,75 @@
   --ring: 252 80% 64%;
 }
 
+.light {
+  --button-outline: rgba(0,0,0,.12);
+  --badge-outline: rgba(0,0,0,.06);
+  --opaque-button-border-intensity: -10;
+  --elevate-1: rgba(0,0,0,.04);
+  --elevate-2: rgba(0,0,0,.08);
+
+  --background: 220 20% 97%;
+  --foreground: 220 15% 12%;
+  --border: 220 15% 86%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 15% 12%;
+  --card-border: 220 15% 88%;
+  --sidebar: 220 18% 92%;
+  --sidebar-foreground: 220 12% 25%;
+  --sidebar-border: 220 15% 84%;
+  --sidebar-primary: 252 80% 58%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 220 18% 88%;
+  --sidebar-accent-foreground: 220 15% 15%;
+  --sidebar-ring: 252 80% 58%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 15% 12%;
+  --popover-border: 220 15% 86%;
+  --primary: 252 80% 58%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 15% 92%;
+  --secondary-foreground: 220 12% 25%;
+  --muted: 220 15% 94%;
+  --muted-foreground: 220 10% 48%;
+  --accent: 252 80% 58%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --input: 220 15% 90%;
+  --ring: 252 80% 58%;
+
+  --primary-border: hsl(from hsl(var(--primary)) h s calc(l - 8));
+  --secondary-border: hsl(from hsl(var(--secondary)) h s calc(l - 8));
+  --muted-border: hsl(from hsl(var(--muted)) h s calc(l - 8));
+  --accent-border: hsl(from hsl(var(--accent)) h s calc(l - 8));
+  --destructive-border: hsl(from hsl(var(--destructive)) h s calc(l - 8));
+  --sidebar-primary-border: hsl(from hsl(var(--sidebar-primary)) h s calc(l - 8));
+  --sidebar-accent-border: hsl(from hsl(var(--sidebar-accent)) h s calc(l - 8));
+}
+
+@keyframes slide-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes slide-out-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.menu-slide-in {
+  animation: slide-in-left 0.22s cubic-bezier(.4,0,.2,1) forwards;
+}
+.menu-slide-out {
+  animation: slide-out-left 0.2s cubic-bezier(.4,0,.2,1) forwards;
+}
+.menu-overlay-in {
+  animation: fade-in 0.2s ease forwards;
+}
+
 @layer base {
   * {
     @apply border-border;

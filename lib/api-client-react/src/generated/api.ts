@@ -20,12 +20,16 @@ import type {
   CreateMessageBody,
   CreateServerBody,
   DeleteMessageBody,
+  DmConversation,
+  DmMessage,
   ErrorResponse,
   FindByCodeBody,
+  GetOrCreateDmBody,
   HealthStatus,
   InviteCodeResponse,
   JoinByCodeBody,
   JoinServerBody,
+  ListDmMessagesParams,
   ListMessagesParams,
   Message,
   OnlineUser,
@@ -33,6 +37,7 @@ import type {
   PresenceBody,
   PresenceResponse,
   RedeemTransferBody,
+  SendDmBody,
   Server,
   TransferCodeResponse,
   TypingBody,
@@ -1528,6 +1533,387 @@ export function useGetOnlineUsers<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Get or create a DM conversation between two users
+ */
+export const getGetOrCreateDmUrl = () => {
+  return `/api/dm/conversations`;
+};
+
+export const getOrCreateDm = async (
+  getOrCreateDmBody: GetOrCreateDmBody,
+  options?: RequestInit,
+): Promise<DmConversation> => {
+  return customFetch<DmConversation>(getGetOrCreateDmUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(getOrCreateDmBody),
+  });
+};
+
+export const getGetOrCreateDmMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof getOrCreateDm>>,
+    TError,
+    { data: BodyType<GetOrCreateDmBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof getOrCreateDm>>,
+  TError,
+  { data: BodyType<GetOrCreateDmBody> },
+  TContext
+> => {
+  const mutationKey = ["getOrCreateDm"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof getOrCreateDm>>,
+    { data: BodyType<GetOrCreateDmBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return getOrCreateDm(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type GetOrCreateDmMutationResult = NonNullable<
+  Awaited<ReturnType<typeof getOrCreateDm>>
+>;
+export type GetOrCreateDmMutationBody = BodyType<GetOrCreateDmBody>;
+export type GetOrCreateDmMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Get or create a DM conversation between two users
+ */
+export const useGetOrCreateDm = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof getOrCreateDm>>,
+    TError,
+    { data: BodyType<GetOrCreateDmBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof getOrCreateDm>>,
+  TError,
+  { data: BodyType<GetOrCreateDmBody> },
+  TContext
+> => {
+  return useMutation(getGetOrCreateDmMutationOptions(options));
+};
+
+/**
+ * @summary List all DM conversations for a user
+ */
+export const getListDmConversationsUrl = (userId: string) => {
+  return `/api/dm/conversations/user/${userId}`;
+};
+
+export const listDmConversations = async (
+  userId: string,
+  options?: RequestInit,
+): Promise<DmConversation[]> => {
+  return customFetch<DmConversation[]>(getListDmConversationsUrl(userId), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListDmConversationsQueryKey = (userId: string) => {
+  return [`/api/dm/conversations/user/${userId}`] as const;
+};
+
+export const getListDmConversationsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDmConversations>>,
+  TError = ErrorType<unknown>,
+>(
+  userId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDmConversations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListDmConversationsQueryKey(userId);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listDmConversations>>
+  > = ({ signal }) =>
+    listDmConversations(userId, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!userId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDmConversations>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDmConversationsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDmConversations>>
+>;
+export type ListDmConversationsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List all DM conversations for a user
+ */
+
+export function useListDmConversations<
+  TData = Awaited<ReturnType<typeof listDmConversations>>,
+  TError = ErrorType<unknown>,
+>(
+  userId: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDmConversations>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDmConversationsQueryOptions(userId, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get messages in a DM conversation
+ */
+export const getListDmMessagesUrl = (
+  conversationId: string,
+  params?: ListDmMessagesParams,
+) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/dm/conversations/${conversationId}/messages?${stringifiedParams}`
+    : `/api/dm/conversations/${conversationId}/messages`;
+};
+
+export const listDmMessages = async (
+  conversationId: string,
+  params?: ListDmMessagesParams,
+  options?: RequestInit,
+): Promise<DmMessage[]> => {
+  return customFetch<DmMessage[]>(
+    getListDmMessagesUrl(conversationId, params),
+    {
+      ...options,
+      method: "GET",
+    },
+  );
+};
+
+export const getListDmMessagesQueryKey = (
+  conversationId: string,
+  params?: ListDmMessagesParams,
+) => {
+  return [
+    `/api/dm/conversations/${conversationId}/messages`,
+    ...(params ? [params] : []),
+  ] as const;
+};
+
+export const getListDmMessagesQueryOptions = <
+  TData = Awaited<ReturnType<typeof listDmMessages>>,
+  TError = ErrorType<unknown>,
+>(
+  conversationId: string,
+  params?: ListDmMessagesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDmMessages>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey =
+    queryOptions?.queryKey ?? getListDmMessagesQueryKey(conversationId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listDmMessages>>> = ({
+    signal,
+  }) => listDmMessages(conversationId, params, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!conversationId,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listDmMessages>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListDmMessagesQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listDmMessages>>
+>;
+export type ListDmMessagesQueryError = ErrorType<unknown>;
+
+/**
+ * @summary Get messages in a DM conversation
+ */
+
+export function useListDmMessages<
+  TData = Awaited<ReturnType<typeof listDmMessages>>,
+  TError = ErrorType<unknown>,
+>(
+  conversationId: string,
+  params?: ListDmMessagesParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listDmMessages>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListDmMessagesQueryOptions(
+    conversationId,
+    params,
+    options,
+  );
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Send a DM message
+ */
+export const getSendDmMessageUrl = (conversationId: string) => {
+  return `/api/dm/conversations/${conversationId}/messages`;
+};
+
+export const sendDmMessage = async (
+  conversationId: string,
+  sendDmBody: SendDmBody,
+  options?: RequestInit,
+): Promise<DmMessage> => {
+  return customFetch<DmMessage>(getSendDmMessageUrl(conversationId), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(sendDmBody),
+  });
+};
+
+export const getSendDmMessageMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendDmMessage>>,
+    TError,
+    { conversationId: string; data: BodyType<SendDmBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof sendDmMessage>>,
+  TError,
+  { conversationId: string; data: BodyType<SendDmBody> },
+  TContext
+> => {
+  const mutationKey = ["sendDmMessage"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof sendDmMessage>>,
+    { conversationId: string; data: BodyType<SendDmBody> }
+  > = (props) => {
+    const { conversationId, data } = props ?? {};
+
+    return sendDmMessage(conversationId, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SendDmMessageMutationResult = NonNullable<
+  Awaited<ReturnType<typeof sendDmMessage>>
+>;
+export type SendDmMessageMutationBody = BodyType<SendDmBody>;
+export type SendDmMessageMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Send a DM message
+ */
+export const useSendDmMessage = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof sendDmMessage>>,
+    TError,
+    { conversationId: string; data: BodyType<SendDmBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof sendDmMessage>>,
+  TError,
+  { conversationId: string; data: BodyType<SendDmBody> },
+  TContext
+> => {
+  return useMutation(getSendDmMessageMutationOptions(options));
+};
 
 /**
  * @summary Send typing indicator

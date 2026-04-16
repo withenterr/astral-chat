@@ -283,6 +283,90 @@ export const GetOnlineUsersResponseItem = zod.object({
 export const GetOnlineUsersResponse = zod.array(GetOnlineUsersResponseItem);
 
 /**
+ * @summary Get or create a DM conversation between two users
+ */
+export const GetOrCreateDmBody = zod.object({
+  userAId: zod.string(),
+  userAName: zod.string(),
+  userAColor: zod.string().optional(),
+  userBId: zod.string(),
+  userBName: zod.string(),
+  userBColor: zod.string().optional(),
+});
+
+export const GetOrCreateDmResponse = zod.object({
+  id: zod.string(),
+  userAId: zod.string(),
+  userAName: zod.string(),
+  userAColor: zod.string().optional(),
+  userBId: zod.string(),
+  userBName: zod.string(),
+  userBColor: zod.string().optional(),
+  lastMessageAt: zod.coerce.date(),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary List all DM conversations for a user
+ */
+export const ListDmConversationsParams = zod.object({
+  userId: zod.coerce.string(),
+});
+
+export const ListDmConversationsResponseItem = zod.object({
+  id: zod.string(),
+  userAId: zod.string(),
+  userAName: zod.string(),
+  userAColor: zod.string().optional(),
+  userBId: zod.string(),
+  userBName: zod.string(),
+  userBColor: zod.string().optional(),
+  lastMessageAt: zod.coerce.date(),
+  createdAt: zod.coerce.date(),
+});
+export const ListDmConversationsResponse = zod.array(
+  ListDmConversationsResponseItem,
+);
+
+/**
+ * @summary Get messages in a DM conversation
+ */
+export const ListDmMessagesParams = zod.object({
+  conversationId: zod.coerce.string(),
+});
+
+export const listDmMessagesQueryLimitDefault = 50;
+
+export const ListDmMessagesQueryParams = zod.object({
+  limit: zod.coerce.number().default(listDmMessagesQueryLimitDefault),
+});
+
+export const ListDmMessagesResponseItem = zod.object({
+  id: zod.string(),
+  conversationId: zod.string(),
+  senderId: zod.string(),
+  senderName: zod.string(),
+  senderColor: zod.string().optional(),
+  content: zod.string(),
+  createdAt: zod.coerce.date(),
+});
+export const ListDmMessagesResponse = zod.array(ListDmMessagesResponseItem);
+
+/**
+ * @summary Send a DM message
+ */
+export const SendDmMessageParams = zod.object({
+  conversationId: zod.coerce.string(),
+});
+
+export const SendDmMessageBody = zod.object({
+  senderId: zod.string(),
+  senderName: zod.string(),
+  senderColor: zod.string().optional(),
+  content: zod.string(),
+});
+
+/**
  * @summary Send typing indicator
  */
 export const SendTypingIndicatorParams = zod.object({

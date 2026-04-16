@@ -1,4 +1,4 @@
-import { pgTable, text, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -46,13 +46,39 @@ export const typingTable = pgTable("typing", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const dmConversationsTable = pgTable("dm_conversations", {
+  id: text("id").primaryKey(),
+  userAId: text("user_a_id").notNull(),
+  userAName: text("user_a_name").notNull(),
+  userAColor: text("user_a_color"),
+  userBId: text("user_b_id").notNull(),
+  userBName: text("user_b_name").notNull(),
+  userBColor: text("user_b_color"),
+  lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const dmMessagesTable = pgTable("dm_messages", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id").notNull().references(() => dmConversationsTable.id, { onDelete: "cascade" }),
+  senderId: text("sender_id").notNull(),
+  senderName: text("sender_name").notNull(),
+  senderColor: text("sender_color"),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const insertServerSchema = createInsertSchema(serversTable);
 export const insertMessageSchema = createInsertSchema(messagesTable);
 export const insertPresenceSchema = createInsertSchema(presenceTable);
 export const insertTypingSchema = createInsertSchema(typingTable);
+export const insertDmConversationSchema = createInsertSchema(dmConversationsTable);
+export const insertDmMessageSchema = createInsertSchema(dmMessagesTable);
 
 export type Server = typeof serversTable.$inferSelect;
 export type ServerMember = typeof serverMembersTable.$inferSelect;
 export type Message = typeof messagesTable.$inferSelect;
 export type Presence = typeof presenceTable.$inferSelect;
 export type Typing = typeof typingTable.$inferSelect;
+export type DmConversation = typeof dmConversationsTable.$inferSelect;
+export type DmMessage = typeof dmMessagesTable.$inferSelect;

@@ -15,6 +15,8 @@ tags:
     description: Message operations
   - name: presence
     description: Online presence operations
+  - name: dm
+    description: Direct message operations
 
 paths:
   /healthz:
@@ -450,6 +452,95 @@ paths:
                 items:
                   $ref: "#/components/schemas/OnlineUser"
 
+  /dm/conversations:
+    post:
+      operationId: getOrCreateDm
+      tags: [dm]
+      summary: Get or create a DM conversation between two users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GetOrCreateDmBody"
+      responses:
+        "200":
+          description: DM conversation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DmConversation"
+
+  /dm/conversations/user/{userId}:
+    get:
+      operationId: listDmConversations
+      tags: [dm]
+      summary: List all DM conversations for a user
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of DM conversations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DmConversation"
+
+  /dm/conversations/{conversationId}/messages:
+    get:
+      operationId: listDmMessages
+      tags: [dm]
+      summary: Get messages in a DM conversation
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        "200":
+          description: List of DM messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DmMessage"
+    post:
+      operationId: sendDmMessage
+      tags: [dm]
+      summary: Send a DM message
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendDmBody"
+      responses:
+        "201":
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DmMessage"
+
   /servers/{serverId}/typing:
     post:
       operationId: sendTypingIndicator
@@ -760,3 +851,98 @@ components:
           type: string
       required:
         - error
+
+    DmConversation:
+      type: object
+      properties:
+        id:
+          type: string
+        userAId:
+          type: string
+        userAName:
+          type: string
+        userAColor:
+          type: string
+        userBId:
+          type: string
+        userBName:
+          type: string
+        userBColor:
+          type: string
+        lastMessageAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userAId
+        - userAName
+        - userBId
+        - userBName
+        - lastMessageAt
+        - createdAt
+
+    DmMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        conversationId:
+          type: string
+        senderId:
+          type: string
+        senderName:
+          type: string
+        senderColor:
+          type: string
+        content:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - conversationId
+        - senderId
+        - senderName
+        - content
+        - createdAt
+
+    GetOrCreateDmBody:
+      type: object
+      properties:
+        userAId:
+          type: string
+        userAName:
+          type: string
+        userAColor:
+          type: string
+        userBId:
+          type: string
+        userBName:
+          type: string
+        userBColor:
+          type: string
+      required:
+        - userAId
+        - userAName
+        - userBId
+        - userBName
+
+    SendDmBody:
+      type: object
+      properties:
+        senderId:
+          type: string
+        senderName:
+          type: string
+        senderColor:
+          type: string
+        content:
+          type: string
+      required:
+        - senderId
+        - senderName
+        - content
