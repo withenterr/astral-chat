@@ -67,77 +67,47 @@
       </section>
 
       <section id="auth-view" class="panel auth-panel">
-        <p class="eyebrow">Account Selection</p>
-        <h2>Log In Or Sign Up</h2>
+        <p class="eyebrow">Welcome to World Chat</p>
+        <h2>Join as Guest or Create Account</h2>
         <p class="lede auth-lede">
-          Create an account with a unique username and password, or log in with an existing one
-          before you enter the chat.
+          You're automatically joined as a guest. Create a permanent account 
+          to save your username and messages.
         </p>
 
-        <div class="auth-switcher" role="tablist" aria-label="Account options">
-          <button
-            id="log-in-tab"
-            class="secondary-button auth-tab auth-tab--active"
-            type="button"
-            aria-selected="true"
-          >
-            Log In
-          </button>
-          <button
-            id="sign-up-tab"
-            class="secondary-button auth-tab"
-            type="button"
-            aria-selected="false"
-          >
-            Sign Up
-          </button>
+        <div class="guest-info" id="guest-info">
+          <p><strong>Guest Session</strong></p>
+          <p id="guest-username">Loading...</p>
+          <button id="upgrade-button" class="primary-button">Create Permanent Account</button>
         </div>
 
-        <form id="log-in-form" class="stack auth-form" onsubmit="return false;">
+        <form id="upgrade-form" class="stack auth-form is-hidden">
           <label class="field">
             <span>Username</span>
             <input
-              id="log-in-username"
+              id="upgrade-username"
               name="username"
               type="text"
               maxlength="24"
-              placeholder="Your username"
+              placeholder="Choose a permanent username"
               autocomplete="username"
+              required
+            />
+          </label>
+          <label class="field">
+            <span>Email</span>
+            <input
+              id="upgrade-email"
+              name="email"
+              type="email"
+              placeholder="your@email.com"
+              autocomplete="email"
               required
             />
           </label>
           <label class="field">
             <span>Password</span>
             <input
-              id="log-in-password"
-              name="password"
-              type="password"
-              placeholder="Your password"
-              autocomplete="current-password"
-              required
-            />
-          </label>
-          <button id="log-in-submit-button" class="primary-button" type="button">Log In</button>
-        </form>
-
-        <form id="sign-up-form" class="stack auth-form is-hidden" onsubmit="return false;">
-          <label class="field">
-            <span>Username</span>
-            <input
-              id="sign-up-username"
-              name="username"
-              type="text"
-              maxlength="24"
-              placeholder="Choose a username"
-              autocomplete="username"
-              required
-            />
-          </label>
-          <p id="sign-up-username-status" class="field-status is-hidden" aria-live="polite"></p>
-          <label class="field">
-            <span>Password</span>
-            <input
-              id="sign-up-password"
+              id="upgrade-password"
               name="password"
               type="password"
               placeholder="Create a password"
@@ -145,13 +115,10 @@
               required
             />
           </label>
-          <button id="create-account-button" class="primary-button" type="button" disabled>
-            Create Account
-          </button>
+          <button id="confirm-upgrade-button" class="primary-button" type="button">Create Account</button>
         </form>
 
         <p id="auth-status" class="field-status is-hidden" aria-live="polite"></p>
-        <p class="auth-note">Accounts not used for more than 1 week are deleted.</p>
       </section>
 
       <section id="chat-view" class="chat-screen is-hidden">

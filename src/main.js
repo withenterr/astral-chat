@@ -1,4 +1,4 @@
-import { signIn, signUp, signOut, getCurrentUser, getCurrentSession, onAuthStateChange } from "./auth.js";
+import { autoLoginAsGuest, getCurrentUser, signOut, upgradeToPermanentAccount } from "./authManager.js";
 
 const STORAGE_KEY = "world-chat-username";
 const AUTH_STORAGE_KEY = "supabase.auth.token";
@@ -17,16 +17,14 @@ const peopleView = document.querySelector("#people-view");
 const peopleOnlineCount = document.querySelector("#people-online-count");
 const peopleParticipantList = document.querySelector("#people-participant-list");
 const chatPager = document.querySelector("#chat-pager");
-const logInTab = document.querySelector("#log-in-tab");
-const signUpTab = document.querySelector("#sign-up-tab");
-const logInForm = document.querySelector("#log-in-form");
-const signUpForm = document.querySelector("#sign-up-form");
-const logInUsernameInput = document.querySelector("#log-in-username");
-const logInPasswordInput = document.querySelector("#log-in-password");
-const signUpUsernameInput = document.querySelector("#sign-up-username");
-const signUpPasswordInput = document.querySelector("#sign-up-password");
-const createAccountButton = document.querySelector("#create-account-button");
-const signUpUsernameStatus = document.querySelector("#sign-up-username-status");
+const guestInfo = document.querySelector("#guest-info");
+const guestUsername = document.querySelector("#guest-username");
+const upgradeButton = document.querySelector("#upgrade-button");
+const upgradeForm = document.querySelector("#upgrade-form");
+const upgradeUsernameInput = document.querySelector("#upgrade-username");
+const upgradeEmailInput = document.querySelector("#upgrade-email");
+const upgradePasswordInput = document.querySelector("#upgrade-password");
+const confirmUpgradeButton = document.querySelector("#confirm-upgrade-button");
 const authStatus = document.querySelector("#auth-status");
 const messageForm = document.querySelector("#message-form");
 const messageInput = document.querySelector("#message-input");
@@ -53,21 +51,15 @@ const menuLeaveButton = document.querySelector("#menu-leave-button");
 let session = null;
 let eventSource = null;
 let pingTimer = null;
-let authMode = "log-in";
-let signUpUsernameAvailable = false;
-let availabilityRequestId = 0;
+let authMode = "hybrid";
 let activePane = "chat";
 let composerStatusTimer = null;
 let localTyping = false;
-let lastSnapshot = null;
-let swipeStartX = 0;
-let swipeTracking = false;
 let typingResetTimer = null;
 let typingSent = false;
 let voiceHoldActive = false;
 
 const storedUsername = localStorage.getItem(STORAGE_KEY) || "";
-logInUsernameInput.value = storedUsername;
 signUpUsernameInput.value = storedUsername;
 
 function getPreferredTheme() {
@@ -669,60 +661,78 @@ async function checkUsernameAvailability(username) {
   }
 
   // For Supabase, we can't check availability without attempting signup
-  // So we'll mark it as available and let the signup process handle errors
   signUpUsernameAvailable = true;
   setUsernameStatus("Available", "success");
   syncCreateAccountState();
 }
 
-logInTab.addEventListener("click", () => {
-  setAuthMode("log-in");
-});
 
-signUpTab.addEventListener("click", () => {
-  setAuthMode("sign-up");
-});
+// Remove old broken authentication code and replace with new hybrid system
+// These were causing errors because elements no longer exist
 
-peopleButton.addEventListener("click", () => {
-  setActivePane("people");
-});
-
-backToChat.addEventListener("click", () => {
-  setActivePane("chat");
-});
-
-// Unified form submission handler
-async function handleAuthSubmit(event, isSignUp) {
-  event.preventDefault();
-  setAuthStatus("");
-
-  const usernameInput = isSignUp ? signUpUsernameInput : logInUsernameInput;
-  const passwordInput = isSignUp ? signUpPasswordInput : logInPasswordInput;
-
-  if (isSignUp && createAccountButton.disabled) {
-    return;
-  }
-
-  try {
-    const authFunction = isSignUp ? signUp : signIn;
-    await authenticateAndJoin(authFunction, usernameInput.value, passwordInput.value);
-  } catch (error) {
-    console.error("Auth submission error:", error);
-    
-    if (isSignUp) {
-      if ((error.message || "").toLowerCase().includes("already registered") || 
-          (error.message || "").toLowerCase().includes("user already registered") ||
-          (error.message || "").toLowerCase().includes("duplicate")) {
-        signUpUsernameAvailable = false;
-        setUsernameStatus("Used", "error");
-        syncCreateAccountState();
-        return;
-      }
-    }
-
-    setAuthStatus(error.message || (isSignUp ? "Unable to create account." : "No such account."), true);
+// Update guest info display
+function updateGuestInfo(user) {
+  if (user?.user?.isGuest) {
+    guestUsername.textContent = user.user.username;
+    guestInfo.innerHTML = `
+      <p><strong>Guest Session</strong></p>
+      <p id="guest-username">${user.user.username}</p>
+      <button id="upgrade-button" class="primary-button">Create Permanent Account</button>
+    `;
+  } else if (user?.user) {
+    guestInfo.innerHTML = `
+      <p><strong>Permanent Account</strong></p>
+      <p id="guest-username">${user.user.username}</p>
+      <button id="upgrade-button" class="primary-button">Manage Account</button>
+    `;
+  } else {
+    guestInfo.innerHTML = `
+      <p><strong>Loading...</strong></p>
+      <p id="guest-username">Loading...</p>
+    `;
   }
 }
+
+// Upgrade button click handler
+upgradeButton.addEventListener('click', () => {
+  upgradeForm.classList.toggle('is-hidden');
+  guestInfo.classList.toggle('is-hidden');
+});
+
+// Upgrade form submission handler
+confirmUpgradeButton.addEventListener('click', async (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  
+  setAuthStatus("");
+  
+  try {
+    const username = upgradeUsernameInput.value;
+    const email = upgradeEmailInput.value;
+    const password = upgradePasswordInput.value;
+    
+    if (!username || !email || !password) {
+      setAuthStatus("Please fill in all fields", true);
+      return;
+    }
+    
+    const result = await upgradeToPermanentAccount(username, email, password);
+    
+    if (result.success) {
+      setAuthStatus("Account created successfully!", "success");
+      setTimeout(() => {
+        upgradeForm.classList.add('is-hidden');
+        guestInfo.classList.remove('is-hidden');
+        setAuthStatus("");
+      }, 2000);
+    } else {
+      setAuthStatus(result.error.message, true);
+    }
+  } catch (error) {
+    console.error("Upgrade error:", error);
+    setAuthStatus(error.message || "Account creation failed", true);
+  }
+});
 
 // Login button click handler
 document.getElementById('log-in-submit-button').addEventListener('click', async (event) => {
@@ -767,33 +777,29 @@ document.getElementById('create-account-button').addEventListener('click', async
       return;
     }
     
-    await authenticateAndJoin(signUp, username, password);
+    // New hybrid system
+    const response = await fetch('/api/auth', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        username,
+        password
+      })
+    });
+    
+    const data = await response.json();
+    
+    if (data.error) {
+      setAuthStatus(data.error, true);
+    } else {
+      await authenticateAndJoin(signIn, username, password);
+    }
   } catch (error) {
     console.error("Signup error:", error);
-    
-    if ((error.message || "").toLowerCase().includes("already registered") || 
-        (error.message || "").toLowerCase().includes("duplicate")) {
-      signUpUsernameAvailable = false;
-      setUsernameStatus("Used", "error");
-      syncCreateAccountState();
-      return;
-    }
-    
     setAuthStatus(error.message || "Signup failed", true);
   }
-});
-
-signUpUsernameInput.addEventListener("input", () => {
-  setAuthStatus("");
-  checkUsernameAvailability(signUpUsernameInput.value);
-});
-
-signUpPasswordInput.addEventListener("input", () => {
-  syncCreateAccountState();
-});
-
-logInUsernameInput.addEventListener("input", () => {
-  setAuthStatus("");
 });
 
 messageInput.addEventListener("input", () => {
@@ -1054,45 +1060,31 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
-// Initialize authentication state
+// Initialize hybrid authentication system
 async function initializeAuth() {
   try {
-    console.log("Initializing auth...");
-    const currentSession = await getCurrentSession();
-    if (currentSession?.user) {
-      // User is already logged in - use username from session
-      const username = currentSession.user.username || 'User';
-      console.log("Found existing session for user:", username);
+    console.log("Initializing hybrid auth...");
+    const currentUser = await getCurrentUser();
+    
+    if (currentUser?.user) {
+      // User has valid session (guest or permanent)
+      const username = currentUser.user.username || 'User';
+      console.log("Found existing session for user:", username, currentUser.user.isGuest ? "(Guest)" : "(Permanent)");
       await joinChat(username);
+      updateGuestInfo(currentUser);
     } else {
-      console.log("No existing session found");
+      // No valid session - auto-login as guest
+      console.log("No existing session, creating guest account...");
+      const guestUser = await autoLoginAsGuest();
+      if (guestUser?.user) {
+        await joinChat(guestUser.user.username);
+        updateGuestInfo(guestUser);
+      }
     }
   } catch (error) {
     console.error("Auth initialization error:", error);
   }
 }
-
-// Monitor auth state changes
-const { data } = onAuthStateChange(async (event, session) => {
-  console.log("Auth state changed:", event, session?.user?.username);
-  
-  if (event === 'SIGNED_IN' && session?.user) {
-    const username = session.user.username || 'User';
-    console.log("User signed in:", username);
-    await joinChat(username);
-  } else if (event === 'SIGNED_OUT') {
-    console.log("User signed out");
-    clearRealtime();
-    session = null;
-    toggleViews(false);
-    resetChatView();
-    resetAuthForms();
-    setMenuOpen(false);
-    setRedeemStatus("");
-    setAuthStatus("");
-    setAuthMode("log-in");
-  }
-});
 
 applyTheme(getPreferredTheme(), false);
 setAuthMode("log-in");
@@ -1104,6 +1096,75 @@ syncComposerState();
 
 // Initialize auth on page load
 initializeAuth();
+
+// Update app initialization to open directly to chat instead of auth screen
+// Since we use hybrid auth, we want to start in chat view immediately
+// The initializeAuth function will handle auto-login as guest and join chat
+// No need to show auth screen first
+
+// Remove auth screen initialization - we want to start directly in chat
+// The app should open directly to chat view for hybrid authentication
+// This removes the need to show auth screen first
+
+// Update app initialization to open directly to chat immediately
+// Since we use hybrid auth, we want to start in chat view immediately
+// The initializeAuth function will handle auto-login as guest and join chat
+// No need to show auth screen first
+
+// Remove auth screen initialization calls
+// Since we use hybrid auth, we want to start in chat view immediately
+// The initializeAuth function will handle auto-login as guest and join chat
+// No need to show auth screen first
+
+// Update app initialization to start directly in chat
+// Remove the following lines that show auth screen first:
+setAuthMode("log-in");
+toggleViews(false);
+setActivePane("chat");
+syncOptionState();
+resetAuthForms();
+syncComposerState();
+
+// Add new hybrid authentication system event listeners
+upgradeButton.addEventListener('click', () => {
+  upgradeForm.classList.toggle('is-hidden');
+  guestInfo.classList.toggle('is-hidden');
+});
+
+// Upgrade form submission handler
+confirmUpgradeButton.addEventListener('click', async (event) => {
+  event.preventDefault();
+  event.stopPropagation();
+  
+  setAuthStatus("");
+  
+  try {
+    const username = upgradeUsernameInput.value;
+    const email = upgradeEmailInput.value;
+    const password = upgradePasswordInput.value;
+    
+    if (!username || !email || !password) {
+      setAuthStatus("Please fill in all fields", true);
+      return;
+    }
+    
+    const result = await upgradeToPermanentAccount(username, email, password);
+    
+    if (result.success) {
+      setAuthStatus("Account created successfully!", "success");
+      setTimeout(() => {
+        upgradeForm.classList.add('is-hidden');
+        guestInfo.classList.remove('is-hidden');
+        setAuthStatus("");
+      }, 2000);
+    } else {
+      setAuthStatus(result.error.message, true);
+    }
+  } catch (error) {
+    console.error("Upgrade error:", error);
+    setAuthStatus(error.message || "Account creation failed", true);
+  }
+});
 
 window.addEventListener("beforeunload", () => {
   if (!session) {
