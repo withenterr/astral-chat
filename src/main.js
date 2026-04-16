@@ -9,7 +9,7 @@ const rootElement = document.documentElement;
 const bodyElement = document.body;
 const menuToggle = document.querySelector("#menu-toggle");
 const optionsMenu = document.querySelector("#options-menu");
-const authView = document.querySelector("#auth-view");
+// Remove auth view - app opens directly to chat
 const chatView = document.querySelector("#chat-view");
 const peopleButton = document.querySelector("#people-button");
 const backToChat = document.querySelector("#back-to-chat");
@@ -157,7 +157,7 @@ function syncOptionState() {
 }
 
 function toggleViews(isInChat) {
-  authView.classList.toggle("is-hidden", isInChat);
+  // Remove auth view - always show chat view
   chatView.classList.toggle("is-hidden", !isInChat);
   syncOptionState();
 }
@@ -679,9 +679,10 @@ function updateGuestInfo(user) {
       <button id="upgrade-button" class="primary-button">Manage Account</button>
     `;
   } else {
+    // Remove loading state - always show guest info
     guestInfo.innerHTML = `
-      <p><strong>Loading...</strong></p>
-      <p id="guest-username">Loading...</p>
+      <p><strong>Guest Mode</strong></p>
+      <p id="guest-username">Guest User</p>
     `;
   }
 }
@@ -999,9 +1000,7 @@ chatView.addEventListener(
 peopleView.addEventListener(
   "touchstart",
   (event) => {
-    if (!session || event.touches.length !== 1) {
-      return;
-    }
+    // Remove session-based blocking - always allow touch start
 
     swipeTracking = true;
     swipeStartX = event.touches[0].clientX;
@@ -1068,49 +1067,21 @@ async function initializeAuth() {
       console.error("Failed to create guest account");
     }
   } catch (error) {
-    console.error("Auth initialization error:", error);
-    // Even if auth fails, continue with app to avoid stuck loading
-    setTimeout(() => {
-      const fallbackUser = { user: { username: 'Guest_User', isGuest: true } };
-      updateGuestInfo(fallbackUser);
-      joinChat('Guest_User');
-    }, 1000);
+    console.error("Guest initialization error:", error);
+    // Create default guest user immediately - no loading states
+    const fallbackUser = { user: { username: 'Guest_' + Math.floor(Math.random() * 10000), isGuest: true } };
+    updateGuestInfo(fallbackUser);
+    joinChat(fallbackUser.user.username);
   }
 }
 
 applyTheme(getPreferredTheme(), false);
 
-// Initialize app with simple guest authentication
-// The app will auto-login as guest and open directly to chat
-
-// Simple guest initialization - no Supabase dependencies
-async function initializeGuestApp() {
-  try {
-    console.log("Initializing guest app...");
-    
-    // Create guest user immediately
-    const guestUser = await autoLoginAsGuest();
-    
-    if (guestUser?.user) {
-      const username = guestUser.user.username || 'Guest';
-      console.log("Guest account created:", username);
-      await joinChat(username);
-      updateGuestInfo(guestUser);
-    } else {
-      console.error("Failed to create guest account");
-      // Fallback to ensure app doesn't get stuck
-      const fallbackUser = { user: { username: 'Guest_User', isGuest: true } };
-      updateGuestInfo(fallbackUser);
-      joinChat('Guest_User');
-    }
-  } catch (error) {
-    console.error("Guest initialization error:", error);
-    // Ensure app continues even on error
-    const fallbackUser = { user: { username: 'Guest_Fallback', isGuest: true } };
-    updateGuestInfo(fallbackUser);
-    joinChat('Guest_Fallback');
-  }
-}
+// Start app immediately - no auth gates or loading states
+// Create default guest user and join chat directly
+const defaultGuestUser = { user: { username: 'Guest_' + Math.floor(Math.random() * 10000), isGuest: true } };
+updateGuestInfo(defaultGuestUser);
+joinChat(defaultGuestUser.user.username);
 
 // Initialize app on page load
 initializeGuestApp();
